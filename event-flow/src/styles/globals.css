@@ -1,85 +1,84 @@
-/* src/styles/globals.css */
-
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
-
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─── DESIGN TOKENS ─────────────────────────────────────── */
 :root {
-  --color-primary: #FF6B2C;
-  --color-primary-light: #FF8F5E;
-  --color-primary-dark: #E5501A;
-  --color-primary-bg: #FFF2EC;
+  /* Primary */
+  --color-primary:        #FF6B2C;
+  --color-primary-light:  #FF8F5E;
+  --color-primary-dark:   #E5501A;
+  --color-primary-bg:     #FFF2EC;
 
-  --color-secondary: #00C2A8;
-  --color-secondary-light: #33CFBB;
-  --color-secondary-bg: #E6FAF8;
+  /* Secondary */
+  --color-secondary:      #00C2A8;
+  --color-secondary-light:#33CFBB;
+  --color-secondary-bg:   #E6FAF8;
 
-  --color-neutral-900: #111827;
-  --color-neutral-700: #374151;
-  --color-neutral-500: #6B7280;
-  --color-neutral-300: #D1D5DB;
-  --color-neutral-100: #F3F4F6;
-  --color-neutral-50: #F9FAFB;
+  /* Neutral */
+  --color-neutral-900:    #111827;
+  --color-neutral-700:    #374151;
+  --color-neutral-500:    #6B7280;
+  --color-neutral-300:    #D1D5DB;
+  --color-neutral-100:    #F3F4F6;
+  --color-neutral-50:     #F9FAFB;
+  --color-white:          #FFFFFF;
 
-  --color-success: #16A34A;
-  --color-warning: #D97706;
-  --color-danger: #DC2626;
-  --color-info: #2563EB;
+  /* Semantic */
+  --color-success:        #16A34A;
+  --color-success-bg:     #F0FDF4;
+  --color-warning:        #D97706;
+  --color-warning-bg:     #FFFBEB;
+  --color-danger:         #DC2626;
+  --color-danger-bg:      #FEF2F2;
+  --color-info:           #2563EB;
+  --color-info-bg:        #EFF6FF;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  /* Border Radius */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-full: 9999px;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-btn: 0 2px 8px rgba(255, 107, 44, 0.35);
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.10);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.12);
+  --shadow-btn: 0 2px 8px rgba(255,107,44,0.35);
 }
 
-* {
+/* ─── BASE RESET ─────────────────────────────────────────── */
+*, *::before, *::after {
   box-sizing: border-box;
+}
+
+html, body {
   margin: 0;
   padding: 0;
-}
-
-body {
-  font-family: "Plus Jakarta Sans", sans-serif;
-  background-color: var(--color-neutral-50);
-  color: var(--color-neutral-700);
-  min-height: 100vh;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 14px;
   line-height: 1.6;
+  color: var(--color-neutral-700);
+  background-color: var(--color-neutral-50);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  text-decoration: none;
-  color: inherit;
-}
+/* ─── SCROLLBAR ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-neutral-300); border-radius: var(--radius-full); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-neutral-500); }
 
-button,
-input,
-textarea,
-select {
-  font-family: inherit;
-}
+/* ─── UTILITY CLASSES ────────────────────────────────────── */
+.text-primary   { color: var(--color-primary); }
+.text-secondary { color: var(--color-secondary); }
+.bg-primary-soft { background-color: var(--color-primary-bg); }
+.bg-secondary-soft { background-color: var(--color-secondary-bg); }
 
-button {
-  cursor: pointer;
-  border: none;
-  background: none;
-}
-
-img {
-  max-width: 100%;
-  display: block;
-}
-
-ul,
-ol {
-  list-style: none;
-}
-
-#root {
-  min-height: 100vh;
+/* ─── FOCUS RING ─────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
