@@ -1,35 +1,43 @@
-import axios from 'axios'
+import axios from "axios";
+import { getToken, clearToken } from "./tokenService";
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'
+const BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
   timeout: 15000,
-})
-
-// Request interceptor — attach JWT token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
+  headers: {
+    "Content-Type": "application/json",
   },
-  (error) => Promise.reject(error)
-)
+});
 
-// Response interceptor — handle 401
+/* ===============================
+   REQUEST INTERCEPTOR
+================================ */
+apiClient.interceptors.request.use((config) => {
+  const token = getToken();
+
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+/* ===============================
+   RESPONSE INTERCEPTOR
+================================ */
 apiClient.interceptors.response.use(
-  (response) => response,
+  (res) => res,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      window.location.href = '/login'
+      clearToken();
+      window.location.replace("/login");
     }
-    return Promise.reject(error)
+    return Promise.reject(error);
   }
-)
+);
 
-export default apiClient
+export default apiClient;

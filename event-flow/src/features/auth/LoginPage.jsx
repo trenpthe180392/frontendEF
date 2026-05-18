@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Mail, Lock, Zap } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom' // Import thêm Link để chuyển trang
+import { Mail, Lock, Zap, Facebook } from 'lucide-react' // Import thêm icon Facebook
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import FormField from '../../components/form/FormField'
@@ -13,7 +13,6 @@ function LoginPage() {
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
 
-  // 1. Đổi tên key trong state thành email
   const [form, setForm]       = useState({ email: '', password: '' })
   const [errors, setErrors]   = useState({})
   const [apiError, setApiError] = useState(null)
@@ -25,7 +24,6 @@ function LoginPage() {
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }))
   }
 
-  // 2. Cập nhật hàm validate theo biến email
   function validate() {
     const errs = {}
     if (!form.email.trim()) errs.email = 'Vui lòng nhập email'
@@ -42,10 +40,8 @@ function LoginPage() {
     setApiError(null)
     
     try {
-      // 3. Không cần bước tạo payload trung gian phức tạp nữa, truyền thẳng form đi luôn
       const { data } = await authApi.login(form)
       
-      // Gom dữ liệu user trả về từ Java thành một object gọn gàng
       const userObj = {
         userName: data.userName,
         email: data.email
@@ -61,6 +57,13 @@ function LoginPage() {
     }
   }
 
+  // Hàm xử lý khi click Đăng nhập bằng Facebook
+  function handleFacebookLogin() {
+    // Điều hướng sang URL OAuth2 của Backend Spring Boot
+    // Thay đổi URL này cho đúng với cấu hình Spring Security OAuth2 của bạn (ví dụ: /oauth2/authorization/facebook)
+    window.location.href = 'http://localhost:8080/api/v1/oauth2/authorization/facebook'
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
@@ -73,14 +76,13 @@ function LoginPage() {
           <p className="text-sm text-neutral-500 mt-1">Đăng nhập để tiếp tục</p>
         </div>
 
-        {/* Form */}
+        {/* Form Main Container */}
         <div className="bg-white rounded-xl border border-neutral-300 shadow-sm p-6">
           {apiError && (
             <AlertBanner variant="error" message={apiError} className="mb-4" />
           )}
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* 4. Đổi Label và các biến quản lý lỗi thành email */}
             <FormField label="Email" error={errors.email} required>
               <Input
                 name="email"
@@ -115,7 +117,32 @@ function LoginPage() {
               Đăng nhập
             </Button>
           </form>
+
+          {/* Đường phân cách HOẶC */}
+          <div className="relative flex py-4 items-center">
+            <div className="flex-grow border-t border-neutral-200"></div>
+            <span className="flex-shrink mx-4 text-xs text-neutral-400 uppercase">Hoặc</span>
+            <div className="flex-grow border-t border-neutral-200"></div>
+          </div>
+
+          {/* Nút Đăng nhập Facebook */}
+          <button
+            type="button"
+            onClick={handleFacebookLogin}
+            className="w-full flex items-center justify-center gap-2 bg-[#1877F2] hover:bg-[#166FE5] text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-colors shadow-sm focus:outline-none"
+          >
+            <Facebook size={18} fill="currentColor" />
+            Tiếp tục với Facebook
+          </button>
         </div>
+
+        {/* Link chuyển sang trang Đăng ký */}
+        <p className="text-center text-sm text-neutral-600 mt-6">
+          Chưa có tài khoản?{' '}
+          <Link to="/register" className="text-primary font-semibold hover:underline">
+            Đăng ký ngay
+          </Link>
+        </p>
       </div>
     </div>
   )

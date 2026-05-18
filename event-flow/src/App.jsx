@@ -8,6 +8,8 @@ import { lazy, Suspense } from 'react'
 import Spinner from './components/ui/Spinner'
 
 const LoginPage            = lazy(() => import('./features/auth/LoginPage'))
+const OAuth2SuccessPage = lazy(() => import('./pages/OAuth2SuccessPage'))
+const RegisterPage = lazy(() => import('./features/auth/RegisterPage'))
 const DashboardPage        = lazy(() => import('./pages/DashboardPage'))
 const EventsPage           = lazy(() => import('./pages/EventsPage'))
 const TasksPage            = lazy(() => import('./pages/TasksPage'))
@@ -32,6 +34,8 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/oauth2/success" element={<OAuth2SuccessPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
           {/* Protected routes */}
           <Route element={<ProtectedRoute />}>
