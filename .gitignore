@@ -1,0 +1,12 @@
+/node_modules
+/target
+/dist
+/build
+/.idea
+/.vscode
+*.log
+.env
+event-flow/node_modules/
+event-flow/dist/
+event-flow/build/
+event-flow/.vite/
