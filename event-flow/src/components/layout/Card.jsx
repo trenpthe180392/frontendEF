@@ -10,10 +10,10 @@ import { cn } from '../../utils'
  */
 function Card({ title = '', headerRight = null, noPadding = false, className = '', children }) {
   return (
-    <section className={cn('rounded-xl border border-neutral-300 bg-white shadow-sm', className)}>
+    <section className={cn('rounded-xl border border-neutral-200 bg-white shadow-sm', className)}>
       {(title || headerRight) && (
-        <div className="flex items-center justify-between gap-4 border-b border-neutral-100 px-4 py-3">
-          {title && <h2 className="text-lg font-semibold text-neutral-900">{title}</h2>}
+        <div className="flex flex-col gap-3 border-b border-neutral-100 bg-neutral-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          {title && <h2 className="text-base font-bold text-neutral-900">{title}</h2>}
           {headerRight}
         </div>
       )}

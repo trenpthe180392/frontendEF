@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Plus, Users, X } from 'lucide-react'
+import { ArrowLeft, Plus, Sparkles, Users, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { eventMemberApi, teamApi } from '../api'
+import { aiApi, eventMemberApi, teamApi } from '../api'
 import FormField from '../components/form/FormField'
 import Card from '../components/layout/Card'
 import Badge from '../components/ui/Badge'
@@ -31,6 +31,7 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
   const [form, setForm] = useState(emptyTeamForm)
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSuggesting, setIsSuggesting] = useState(false)
 
   useEffect(() => {
     async function loadMembers() {
@@ -77,6 +78,39 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
     if (!form.description.trim()) nextErrors.description = 'Vui lòng nhập mô tả đội nhóm'
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
+  }
+
+  async function handleSuggestTeam() {
+    setIsSuggesting(true)
+    onError(null)
+    onSuccess(null)
+
+    try {
+      const response = await aiApi.suggestTeams(eventId)
+      const suggestions = response.data?.teams || []
+      const suggestion = suggestions[0]
+
+      if (!suggestion) {
+        onSuccess('AI chưa trả về đội nhóm gợi ý')
+        return
+      }
+
+      const name = suggestion.name?.trim() || 'Đội nhóm AI'
+      setForm((current) => ({
+        ...current,
+        name,
+        teamType: suggestion.teamType || current.teamType,
+        description: suggestion.description || `Đội nhóm ${name} được AI gợi ý cho sự kiện này.`,
+        status: suggestion.status || current.status,
+        addCreatorAsOwner: true,
+      }))
+      setErrors({})
+      onSuccess('AI đã điền gợi ý đội nhóm. Kiểm tra rồi lưu để tạo.')
+    } catch (err) {
+      onError(getErrorMessage(err))
+    } finally {
+      setIsSuggesting(false)
+    }
   }
 
   async function handleSubmit(event) {
@@ -127,6 +161,11 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
 
       <Card title="Thông tin đội nhóm">
         <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="flex justify-end">
+            <Button type="button" variant="secondary" size="sm" loading={isSuggesting} leftIcon={<Sparkles size={16} />} onClick={handleSuggestTeam}>
+              Gợi ý AI
+            </Button>
+          </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <FormField label="Tên đội nhóm" required error={errors.name}>
               <Input name="name" value={form.name} onChange={handleChange} error={errors.name} placeholder="Đội vận hành" />

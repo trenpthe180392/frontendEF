@@ -1,4 +1,4 @@
-import { Building2, ChevronRight, GraduationCap, LogOut, Network, Rocket, Users } from 'lucide-react'
+import { Building2, ChevronRight, CreditCard, GraduationCap, Info, LogOut, Network, Rocket, UserCircle, Users } from 'lucide-react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import useAuthStore from '../../store/authStore'
@@ -6,6 +6,9 @@ import Button from '../ui/Button'
 
 const navItems = [
   { to: '/organizations', label: 'Tổ chức', icon: Building2 },
+  { to: '/subscription', label: 'Gói đăng ký', icon: CreditCard },
+  { to: '/about', label: 'About us', icon: Info },
+  { to: '/profile', label: 'Profile', icon: UserCircle },
 ]
 
 function AppShell() {
@@ -19,8 +22,8 @@ function AppShell() {
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-100 text-neutral-700">
-      <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-5 px-4 sm:px-6">
+      <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex min-h-[76px] max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <Link to="/organizations" className="flex min-w-0 items-center gap-3" aria-label="Trang chủ EventFlow">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white shadow-sm">
               <Network size={21} />
@@ -31,7 +34,7 @@ function AppShell() {
             </div>
           </Link>
 
-          <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Điều hướng chính">
+          <nav className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-1 lg:justify-center" aria-label="Điều hướng chính">
             {navItems.map((item) => {
               const Icon = item.icon
 
@@ -41,8 +44,8 @@ function AppShell() {
                   to={item.to}
                   className={({ isActive }) =>
                     isActive
-                      ? 'inline-flex h-10 items-center gap-2 rounded-lg bg-neutral-900 px-4 text-sm font-semibold text-white shadow-sm'
-                      : 'inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+                      ? 'inline-flex h-10 items-center gap-2 rounded-lg bg-neutral-900 px-3 text-sm font-semibold text-white shadow-sm sm:px-4'
+                      : 'inline-flex h-10 items-center gap-2 rounded-lg border border-transparent px-3 text-sm font-semibold text-neutral-600 hover:border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900 sm:px-4'
                   }
                 >
                   <Icon size={16} />
@@ -52,8 +55,8 @@ function AppShell() {
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden min-w-0 items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 sm:flex">
+          <div className="flex w-full items-center justify-between gap-3 lg:w-auto lg:justify-end">
+            <Link to="/profile" className="flex min-w-0 items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 hover:border-primary/40 hover:bg-primary-bg">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary-bg text-secondary">
                 <Users size={16} />
               </div>
@@ -63,7 +66,7 @@ function AppShell() {
                 </p>
                 <p className="truncate text-xs text-neutral-500">Không gian làm việc đã xác thực</p>
               </div>
-            </div>
+            </Link>
             <Button variant="secondary" size="sm" leftIcon={<LogOut size={16} />} onClick={handleLogout} className="shrink-0">
               Đăng xuất
             </Button>

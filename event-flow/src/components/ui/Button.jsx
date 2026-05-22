@@ -3,10 +3,10 @@ import { Loader2 } from 'lucide-react'
 import { cn } from '../../utils'
 
 const variantClasses = {
-  primary: 'bg-primary text-white shadow-btn hover:bg-primary-light active:bg-primary-dark',
-  secondary: 'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50',
-  ghost: 'bg-transparent text-neutral-700 hover:bg-neutral-100',
-  danger: 'bg-danger text-white hover:bg-danger/90',
+  primary: 'bg-primary text-white shadow-btn ring-1 ring-primary/15 hover:bg-primary-light hover:shadow-md active:bg-primary-dark',
+  secondary: 'border border-neutral-300 bg-white text-neutral-800 shadow-sm hover:border-primary/40 hover:bg-primary-bg hover:text-primary-dark',
+  ghost: 'bg-transparent text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950',
+  danger: 'border border-danger bg-danger text-white shadow-sm hover:bg-danger/90',
 }
 
 const sizeClasses = {
@@ -40,7 +40,7 @@ function Button({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex shrink-0 items-center justify-center rounded-lg font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60',
         variantClasses[variant],
         sizeClasses[size],
         className

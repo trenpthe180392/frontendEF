@@ -1,4 +1,4 @@
-import { FileText, Paperclip, RefreshCw, Trash2, Upload, X } from 'lucide-react'
+import { FileText, Paperclip, Trash2, Upload, X } from 'lucide-react'
 
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
@@ -19,7 +19,6 @@ function TaskDetailPanel({
   isUploading,
   deletingAttachmentId,
   onClose,
-  onReload,
   onUpload,
   onDeleteAttachment,
 }) {
@@ -36,9 +35,6 @@ function TaskDetailPanel({
             <h2 className="mt-1 text-xl font-bold text-neutral-900">{task?.title || 'Đang tải...'}</h2>
           </div>
           <div className="flex gap-2">
-            <Button type="button" variant="ghost" size="sm" leftIcon={<RefreshCw size={16} />} onClick={onReload} loading={isLoading}>
-              Tải lại
-            </Button>
             <Button type="button" variant="ghost" size="sm" leftIcon={<X size={16} />} onClick={onClose}>
               Đóng
             </Button>

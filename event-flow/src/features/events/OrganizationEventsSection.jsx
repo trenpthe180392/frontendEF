@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { eventApi } from '../../api'
 import { getErrorMessage } from '../../utils'
 import { formatDateTime } from '../../utils/dateFormat'
+import useAutoReload from '../../hooks/useAutoReload'
 import { normalizeOrganizationEvent } from '../../utils/organizationMappers'
 import { defaultEventForm } from './eventConstants'
 import { createEventFormFromEvent, toEventPayload } from './eventMappers'
@@ -25,6 +26,8 @@ function OrganizationEventsSection({ organizationId, onError, onSuccess, onCount
     handleReloadEvents()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId])
+
+  useAutoReload(handleReloadEvents)
 
   function handleEventChange(event) {
     const { name, type, checked, value } = event.target
@@ -199,7 +202,6 @@ function OrganizationEventsSection({ organizationId, onError, onSuccess, onCount
       onConfirmDelete={handleConfirmDeleteEvent}
       onCloseCancel={() => setPendingCancelEvent(null)}
       onConfirmCancel={handleConfirmCancelEvent}
-      onReload={handleReloadEvents}
       formatDateTime={formatDateTime}
     />
   )

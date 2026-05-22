@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Mail, Trash2, UserCheck, UserPlus, Users } from 'lucide-react'
+import { Eye, Mail, Trash2, UserCheck, UserPlus, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { organizationMemberApi } from '../../api'
@@ -203,6 +203,14 @@ function OrganizationMembersSection({ organizationId, onError, onSuccess, onCoun
                       {organizationRoleLabels[member.role] || member.role}
                     </Badge>
                     <Badge variant={statusVariant[member.status] || 'default'}>{member.status}</Badge>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<Eye size={16} />}
+                      onClick={() => navigate(`/organizations/${organizationId}/members/${member.userId}`, { state: { member } })}
+                    >
+                      Xem
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

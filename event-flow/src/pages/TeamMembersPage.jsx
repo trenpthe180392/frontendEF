@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BadgeCheck, Pencil, ShieldCheck, Trash2, UserCheck, UserPlus, Users, X } from 'lucide-react'
-import { useParams } from 'react-router-dom'
+import { BadgeCheck, Eye, Pencil, ShieldCheck, Trash2, UserCheck, UserPlus, Users, X } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import { eventMemberApi, teamMemberApi } from '../api'
 import ConfirmDialog from '../components/feedback/ConfirmDialog'
@@ -48,6 +48,8 @@ function normalizeMemberPage(responseData, pageSize = DEFAULT_MEMBERS_PER_PAGE) 
 }
 
 function TeamMembersContent({ eventId, teamId, onError, onSuccess }) {
+  const navigate = useNavigate()
+  const { organizationId } = useParams()
   const [members, setMembers] = useState([])
   const [eventMembers, setEventMembers] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -330,6 +332,14 @@ function TeamMembersContent({ eventId, teamId, onError, onSuccess }) {
                         <Badge variant={statusVariant[member.status] || 'default'}>{member.status}</Badge>
                       </>
                     ) : null}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<Eye size={16} />}
+                      onClick={() => navigate(`/organizations/${organizationId}/events/${eventId}/teams/${teamId}/members/${member.userId}`, { state: { member } })}
+                    >
+                      Xem
+                    </Button>
                     <Button variant="ghost" size="sm" leftIcon={<Pencil size={16} />} onClick={() => startEdit(member)}>
                       Sửa
                     </Button>

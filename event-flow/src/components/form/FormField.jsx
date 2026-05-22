@@ -8,7 +8,7 @@
 function FormField({ label, error = '', required = false, children }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-neutral-700">
+      <span className="mb-2 block text-xs font-bold uppercase text-neutral-500">
         {label}
         {required && <span className="text-danger"> *</span>}
       </span>

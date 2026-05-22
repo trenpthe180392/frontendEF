@@ -279,26 +279,6 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
     }
   }
 
-  async function handleAssignTeam(task, teamId) {
-    setActionId(`assign-${task.id}`)
-    onError(null)
-    onSuccess(null)
-
-    try {
-      if (teamId) {
-        await taskApi.reassignTeam(task.id, Number(teamId))
-      } else {
-        await taskApi.unassign(task.id)
-      }
-      await loadTasks()
-      onSuccess(teamId ? 'Đã gán công việc cho đội nhóm' : 'Đã bỏ gán công việc')
-    } catch (err) {
-      onError(getErrorMessage(err))
-    } finally {
-      setActionId(null)
-    }
-  }
-
   async function handleConfirmDelete() {
     if (!pendingDeleteTask?.id) return
     setActionId(`delete-${pendingDeleteTask.id}`)
@@ -342,6 +322,14 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
   function handlePageSizeChange(nextPageSize) {
     setPageSize(nextPageSize)
     setCurrentPage(1)
+  }
+
+  function getTaskTeamName(task) {
+    if (task.teamName) return task.teamName
+    const assignedTeam = task.assignedTeam || task.team?.name
+    if (assignedTeam) return assignedTeam
+    const matchedTeam = teams.find((team) => Number(team.id) === Number(task.teamId))
+    return matchedTeam?.name || 'Chưa gán'
   }
 
   return (
@@ -396,61 +384,84 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
               </div>
             </div>
             {errors.batch ? <p className="mb-3 text-sm font-medium text-danger">{errors.batch}</p> : null}
-            <div className="rounded-lg border border-neutral-200 bg-white p-3">
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <FormField label="Tên công việc" required error={errors.title}>
-                  <Input name="title" value={taskForm.title} onChange={handleChange} error={errors.title} placeholder="Chuẩn bị sân khấu" />
-                </FormField>
-                <FormField label="Đội nhóm">
-                  <Select name="teamId" value={taskForm.teamId} onChange={handleChange}>
-                    <option value="">Chưa gán đội nhóm</option>
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Thành viên phụ trách">
-                  <Select name="assigneeId" value={taskForm.assigneeId} onChange={handleChange} disabled={!taskForm.teamId}>
-                    <option value="">Chưa gán thành viên</option>
-                    {teamMembers.map((member) => (
-                      <option key={member.userId} value={member.userId}>
-                        {member.userName}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Mức ưu tiên">
-                  <Select name="priority" value={taskForm.priority} onChange={handleChange}>
-                    {taskPriorityOptions.map((priority) => (
-                      <option key={priority} value={priority}>
-                        {priority}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Trạng thái">
-                  <Select name="status" value={taskForm.status} onChange={handleChange}>
-                    {taskStatusOptions.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
-                <FormField label="Hạn hoàn thành" required error={errors.dueTime}>
-                  <Input name="dueTime" type="datetime-local" value={taskForm.dueTime} onChange={handleChange} error={errors.dueTime} />
-                </FormField>
-                <FormField label="Tiến độ" error={errors.progress}>
-                  <Input name="progress" type="number" min="0" max="100" value={taskForm.progress} onChange={handleChange} error={errors.progress} />
-                </FormField>
-                <FormField label="Mô tả">
-                  <Textarea name="description" value={taskForm.description} onChange={handleChange} />
-                </FormField>
+            <div className="rounded-lg border border-neutral-200 bg-white p-4">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                <section className="rounded-lg border border-neutral-200 p-4">
+                  <SectionTitle title="Thông tin công việc" description="Tên, hạn hoàn thành và nội dung cần xử lý." />
+                  <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="lg:col-span-2">
+                      <FormField label="Tên công việc" required error={errors.title}>
+                        <Input name="title" value={taskForm.title} onChange={handleChange} error={errors.title} placeholder="Chuẩn bị sân khấu" />
+                      </FormField>
+                    </div>
+                    <FormField label="Hạn hoàn thành" required error={errors.dueTime}>
+                      <Input name="dueTime" type="datetime-local" value={taskForm.dueTime} onChange={handleChange} error={errors.dueTime} />
+                    </FormField>
+                    <FormField label="Mức ưu tiên">
+                      <Select name="priority" value={taskForm.priority} onChange={handleChange}>
+                        {taskPriorityOptions.map((priority) => (
+                          <option key={priority} value={priority}>
+                            {priority}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    <div className="lg:col-span-2">
+                      <FormField label="Mô tả">
+                        <Textarea name="description" value={taskForm.description} onChange={handleChange} rows={6} />
+                      </FormField>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                    <SectionTitle title="Phân công" description="Chọn đội nhóm rồi chọn thành viên trong đội đó." />
+                    <div className="mt-4 grid grid-cols-1 gap-4">
+                      <FormField label="Đội nhóm">
+                        <Select name="teamId" value={taskForm.teamId} onChange={handleChange}>
+                          <option value="">Chưa gán đội nhóm</option>
+                          {teams.map((team) => (
+                            <option key={team.id} value={team.id}>
+                              {team.name}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                      <FormField label="Thành viên phụ trách">
+                        <Select name="assigneeId" value={taskForm.assigneeId} onChange={handleChange} disabled={!taskForm.teamId}>
+                          <option value="">Chưa gán thành viên</option>
+                          {teamMembers.map((member) => (
+                            <option key={member.userId} value={member.userId}>
+                              {member.userName}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                    <SectionTitle title="Theo dõi" description="Trạng thái và tiến độ ban đầu." />
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <FormField label="Trạng thái">
+                        <Select name="status" value={taskForm.status} onChange={handleChange}>
+                          {taskStatusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                      <FormField label="Tiến độ" error={errors.progress}>
+                        <Input name="progress" type="number" min="0" max="100" value={taskForm.progress} onChange={handleChange} error={errors.progress} />
+                      </FormField>
+                    </div>
+                  </section>
+                </div>
               </div>
               <div className="mt-3 flex justify-end">
-                <Button type="button" variant="secondary" size="sm" leftIcon={<Plus size={16} />} onClick={handleAddCurrentTaskToDrafts}>
+                <Button type="button" variant="primary" size="sm" leftIcon={<Plus size={16} />} onClick={handleAddCurrentTaskToDrafts}>
                   Thêm công việc
                 </Button>
               </div>
@@ -514,7 +525,7 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
         ) : filteredTasks.length === 0 ? (
           <EmptyState icon={<ClipboardList size={24} />} title="Không có công việc phù hợp" description="Đổi trạng thái lọc để xem công việc khác." />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-neutral-300">
+          <div className="overflow-x-auto rounded-lg border border-neutral-300">
             <table className="min-w-full divide-y divide-neutral-100 text-sm">
               <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase text-neutral-500">
                 <tr>
@@ -529,7 +540,7 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
               </thead>
               <tbody className="divide-y divide-neutral-100 bg-white">
                 {pagedTasks.map((task) => (
-                  <tr key={task.id}>
+                  <tr key={task.id} className="hover:bg-neutral-50">
                     <td className="px-4 py-3">
                       <p className="font-semibold text-neutral-900">{task.title}</p>
                       <p className="text-xs text-neutral-500">{task.assigneeName || 'Chưa gán'}</p>
@@ -541,30 +552,19 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
                       <Badge variant={statusVariant[String(task.status || '').toLowerCase()] || 'default'}>{task.status || 'TODO'}</Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <Select
-                        value={task.teamId || ''}
-                        onChange={(event) => handleAssignTeam(task, event.target.value)}
-                        disabled={actionId === `assign-${task.id}`}
-                      >
-                        <option value="">Chưa gán</option>
-                        {teams.map((team) => (
-                          <option key={team.id} value={team.id}>
-                            {team.name}
-                          </option>
-                        ))}
-                      </Select>
+                      <span className="text-sm font-medium text-neutral-700">{getTaskTeamName(task)}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex flex-wrap justify-end gap-2">
-                        <Button type="button" variant="ghost" size="sm" leftIcon={<Eye size={16} />} onClick={() => navigate(`./${task.id}`)}>
+                        <Button type="button" variant="secondary" size="sm" leftIcon={<Eye size={16} />} onClick={() => navigate(`./${task.id}`)}>
                           Xem
                         </Button>
-                        <Button type="button" variant="ghost" size="sm" leftIcon={<Pencil size={16} />} onClick={() => navigate(`./${task.id}/edit`)}>
+                        <Button type="button" variant="primary" size="sm" leftIcon={<Pencil size={16} />} onClick={() => navigate(`./${task.id}/edit`)}>
                           Sửa
                         </Button>
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="danger"
                           size="sm"
                           leftIcon={<Trash2 size={16} />}
                           loading={actionId === `delete-${task.id}`}
@@ -597,6 +597,15 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
       onConfirm={handleConfirmDelete}
     />
     </>
+  )
+}
+
+function SectionTitle({ title, description }) {
+  return (
+    <div>
+      <h3 className="text-sm font-bold uppercase text-neutral-900">{title}</h3>
+      <p className="mt-1 text-sm leading-5 text-neutral-500">{description}</p>
+    </div>
   )
 }
 

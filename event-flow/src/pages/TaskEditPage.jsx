@@ -45,15 +45,18 @@ function TaskEditContent({ eventDetail, eventId, teamId, taskId, backPath, onErr
   async function loadTeamMembers(teamValue) {
     if (!teamValue) {
       setTeamMembers([])
-      return
+      return []
     }
 
     try {
       const response = await teamMemberApi.getByTeam(Number(teamValue))
-      setTeamMembers((response.data || []).map(normalizeTeamMember))
+      const normalizedMembers = (response.data || []).map(normalizeTeamMember)
+      setTeamMembers(normalizedMembers)
+      return normalizedMembers
     } catch (err) {
       setTeamMembers([])
       onError(getErrorMessage(err))
+      return []
     }
   }
 
@@ -63,17 +66,27 @@ function TaskEditContent({ eventDetail, eventId, teamId, taskId, backPath, onErr
 
     try {
       const taskResponse = await taskApi.getById(taskId)
-      const nextForm = createTaskFormFromTask(taskResponse.data)
-      if (teamId) nextForm.teamId = String(teamId)
-      setForm(nextForm)
-      setFixedTeamName(taskResponse.data?.teamName || 'Đội nhóm hiện tại')
+      const task = taskResponse.data || {}
+      const nextForm = createTaskFormFromTask(task)
 
       if (!teamId) {
         const teamsResponse = await teamApi.getByEvent(eventId)
-        setTeams(teamsResponse.data || [])
+        const eventTeams = teamsResponse.data || []
+        setTeams(eventTeams)
+        if (!nextForm.teamId) {
+          nextForm.teamId = resolveTeamId(task, eventTeams)
+        }
+      } else {
+        nextForm.teamId = String(teamId)
       }
 
-      await loadTeamMembers(teamId || nextForm.teamId)
+      const members = await loadTeamMembers(nextForm.teamId)
+      if (!nextForm.assigneeId) {
+        nextForm.assigneeId = resolveAssigneeId(task, members)
+      }
+
+      setForm(nextForm)
+      setFixedTeamName(task.teamName && task.teamName !== 'N/A' ? task.teamName : 'Đội nhóm hiện tại')
     } catch (err) {
       onError(getErrorMessage(err))
     } finally {
@@ -178,63 +191,86 @@ function TaskEditContent({ eventDetail, eventId, teamId, taskId, backPath, onErr
             {errors.event ? (
               <div className="rounded-xl border border-warning/30 bg-warning-bg p-3 text-sm font-medium text-warning">{errors.event}</div>
             ) : null}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <FormField label="Tên công việc" required error={errors.title}>
-                <Input name="title" value={form.title} onChange={handleChange} error={errors.title} placeholder="Chuẩn bị sân khấu" />
-              </FormField>
-              <FormField label="Đội nhóm">
-                {teamId ? (
-                  <Input value={fixedTeamName} disabled />
-                ) : (
-                  <Select name="teamId" value={form.teamId} onChange={handleChange}>
-                    <option value="">Chưa gán đội nhóm</option>
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </FormField>
-              <FormField label="Thành viên phụ trách">
-                <Select name="assigneeId" value={form.assigneeId} onChange={handleChange} disabled={!form.teamId}>
-                  <option value="">Chưa gán thành viên</option>
-                  {teamMembers.map((member) => (
-                    <option key={member.userId} value={member.userId}>
-                      {member.userName}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-              <FormField label="Mức ưu tiên">
-                <Select name="priority" value={form.priority} onChange={handleChange}>
-                  {taskPriorityOptions.map((priority) => (
-                    <option key={priority} value={priority}>
-                      {priority}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-              <FormField label="Trạng thái">
-                <Select name="status" value={form.status} onChange={handleChange}>
-                  {taskStatusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-              <FormField label="Hạn hoàn thành" required error={errors.dueTime}>
-                <Input name="dueTime" type="datetime-local" value={form.dueTime} onChange={handleChange} error={errors.dueTime} />
-              </FormField>
-              <FormField label="Tiến độ" error={errors.progress}>
-                <Input name="progress" type="number" min="0" max="100" value={form.progress} onChange={handleChange} error={errors.progress} />
-              </FormField>
-              <FormField label="Mô tả">
-                <Textarea name="description" value={form.description} onChange={handleChange} />
-              </FormField>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <section className="rounded-lg border border-neutral-200 bg-white p-4">
+                <SectionTitle title="Thông tin chính" description="Tên, mô tả và thời hạn của công việc." />
+                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <div className="lg:col-span-2">
+                    <FormField label="Tên công việc" required error={errors.title}>
+                      <Input name="title" value={form.title} onChange={handleChange} error={errors.title} placeholder="Chuẩn bị sân khấu" />
+                    </FormField>
+                  </div>
+                  <FormField label="Hạn hoàn thành" required error={errors.dueTime}>
+                    <Input name="dueTime" type="datetime-local" value={form.dueTime} onChange={handleChange} error={errors.dueTime} />
+                  </FormField>
+                  <FormField label="Mức ưu tiên">
+                    <Select name="priority" value={form.priority} onChange={handleChange}>
+                      {taskPriorityOptions.map((priority) => (
+                        <option key={priority} value={priority}>
+                          {priority}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                  <div className="lg:col-span-2">
+                    <FormField label="Mô tả">
+                      <Textarea name="description" value={form.description} onChange={handleChange} rows={8} />
+                    </FormField>
+                  </div>
+                </div>
+              </section>
+
+              <div className="grid grid-cols-1 gap-4">
+                <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                  <SectionTitle title="Phân công" description="Đổi đội nhóm trước, sau đó chọn người phụ trách." />
+                  <div className="mt-4 grid grid-cols-1 gap-4">
+                    <FormField label="Đội nhóm">
+                      {teamId ? (
+                        <Input value={fixedTeamName} disabled />
+                      ) : (
+                        <Select name="teamId" value={form.teamId} onChange={handleChange}>
+                          <option value="">Chưa gán đội nhóm</option>
+                          {teams.map((team) => (
+                            <option key={team.id} value={team.id}>
+                              {team.name}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </FormField>
+                    <FormField label="Thành viên phụ trách">
+                      <Select name="assigneeId" value={form.assigneeId} onChange={handleChange} disabled={!form.teamId}>
+                        <option value="">Chưa gán thành viên</option>
+                        {teamMembers.map((member) => (
+                          <option key={member.userId} value={member.userId}>
+                            {member.userName}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                  </div>
+                </section>
+
+                <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                  <SectionTitle title="Theo dõi" description="Trạng thái hiện tại và phần trăm hoàn thành." />
+                  <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField label="Trạng thái">
+                      <Select name="status" value={form.status} onChange={handleChange}>
+                        {taskStatusOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    <FormField label="Tiến độ" error={errors.progress}>
+                      <Input name="progress" type="number" min="0" max="100" value={form.progress} onChange={handleChange} error={errors.progress} />
+                    </FormField>
+                  </div>
+                </section>
+              </div>
             </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <div className="flex flex-col-reverse gap-2 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
               <Button type="button" variant="secondary" onClick={() => navigate(backPath)} disabled={isSubmitting}>
                 Hủy
               </Button>
@@ -245,6 +281,15 @@ function TaskEditContent({ eventDetail, eventId, teamId, taskId, backPath, onErr
           </form>
         )}
       </Card>
+    </div>
+  )
+}
+
+function SectionTitle({ title, description }) {
+  return (
+    <div>
+      <h3 className="text-sm font-bold uppercase text-neutral-900">{title}</h3>
+      <p className="mt-1 text-sm leading-5 text-neutral-500">{description}</p>
     </div>
   )
 }
@@ -330,6 +375,26 @@ function validateTaskDueTime(eventDetail, dueTimeValue) {
   if (start && dueTime < start) return 'Hạn hoàn thành không được trước thời gian bắt đầu sự kiện'
   if (end && dueTime > end) return 'Hạn hoàn thành không được sau thời gian kết thúc sự kiện'
   return null
+}
+
+function resolveTeamId(task, teams) {
+  const teamName = normalizeLookupText(task?.teamName || task?.assignedTeam || task?.team?.name)
+  if (!teamName || teamName === 'n/a') return ''
+
+  const matchedTeam = teams.find((team) => normalizeLookupText(team.name) === teamName)
+  return matchedTeam?.id ? String(matchedTeam.id) : ''
+}
+
+function resolveAssigneeId(task, members) {
+  const assigneeName = normalizeLookupText(task?.assigneeName || task?.assignedTo || task?.assignedToUserName)
+  if (!assigneeName || assigneeName === 'n/a' || assigneeName === 'chưa gán' || assigneeName === 'chưa gán thành viên') return ''
+
+  const matchedMember = members.find((member) => normalizeLookupText(member.userName) === assigneeName)
+  return matchedMember?.userId ? String(matchedMember.userId) : ''
+}
+
+function normalizeLookupText(value) {
+  return String(value || '').trim().toLowerCase()
 }
 
 export default TaskEditPage

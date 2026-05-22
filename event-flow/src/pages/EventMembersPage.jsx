@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BadgeCheck, ShieldCheck, Trash2, UserCheck, UserPlus, Users, X } from 'lucide-react'
-import { useParams } from 'react-router-dom'
+import { BadgeCheck, Eye, ShieldCheck, Trash2, UserCheck, UserPlus, Users, X } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import { eventMemberApi, organizationMemberApi } from '../api'
 import ConfirmDialog from '../components/feedback/ConfirmDialog'
@@ -54,6 +54,7 @@ function normalizeMemberPage(responseData, pageSize = DEFAULT_MEMBERS_PER_PAGE) 
 }
 
 function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
+  const navigate = useNavigate()
   const [members, setMembers] = useState([])
   const [organizationMembers, setOrganizationMembers] = useState([])
   const [memberForm, setMemberForm] = useState(emptyMemberForm)
@@ -300,6 +301,14 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
                   <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={privilegedRoles.has(member.role) ? 'warning' : 'info'}>{eventRoleLabels[member.role] || member.role}</Badge>
                   <Badge variant={statusVariant[member.status] || 'default'}>{member.status}</Badge>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leftIcon={<Eye size={16} />}
+                    onClick={() => navigate(`/organizations/${organizationId}/events/${eventId}/members/${member.userId}`, { state: { member } })}
+                  >
+                    Xem
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

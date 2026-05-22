@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, RefreshCw, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import AlertBanner from '../components/feedback/AlertBanner'
@@ -10,6 +10,7 @@ import { normalizeOrganization } from '../utils/organizationMappers'
 import OrganizationForm from '../features/organizations/OrganizationForm'
 import OrganizationList from '../features/organizations/OrganizationList'
 import { defaultForm, organizationHeroImage } from '../features/organizations/organizationConstants'
+import useAutoReload from '../hooks/useAutoReload'
 
 function OrganizationsPage() {
   const navigate = useNavigate()
@@ -55,6 +56,8 @@ function OrganizationsPage() {
   useEffect(() => {
     handleLoadOrganizations()
   }, [handleLoadOrganizations])
+
+  useAutoReload(handleLoadOrganizations)
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -152,9 +155,6 @@ function OrganizationsPage() {
                     }}
                   >
                     {isCreateOpen ? 'Đóng form' : 'Tạo tổ chức'}
-                  </Button>
-                  <Button variant="secondary" leftIcon={<RefreshCw size={16} />} onClick={handleLoadOrganizations}>
-                    Tải lại
                   </Button>
                 </div>
               </div>

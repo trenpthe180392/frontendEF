@@ -16,6 +16,7 @@ import {
   organizationRoleOptions,
   privilegedOrganizationRoles,
 } from '../features/organizations/organizationRoles'
+import useAutoReload from '../hooks/useAutoReload'
 import { getErrorMessage } from '../utils'
 import { formatDateTime } from '../utils/dateFormat'
 import { normalizeOrganizationInvitation } from '../utils/organizationMappers'
@@ -48,6 +49,8 @@ function OrganizationMemberInvitationsContent({ organizationId, onError, onSucce
     loadInvitations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId])
+
+  useAutoReload(loadInvitations)
 
   function handleEditInvitation(invitation) {
     setEditingInvitationId(invitation.invitationId)
@@ -131,9 +134,6 @@ function OrganizationMemberInvitationsContent({ organizationId, onError, onSucce
         headerRight={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Badge variant="warning">{pendingInvitations.length} đang xử lý</Badge>
-            <Button type="button" variant="secondary" size="sm" onClick={loadInvitations} loading={isLoading}>
-              Tải lại
-            </Button>
           </div>
         }
       >

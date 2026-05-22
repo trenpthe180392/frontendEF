@@ -60,8 +60,8 @@ export function createTaskFormFromTask(task) {
     priority: task?.priority || 'MEDIUM',
     status: task?.status || 'TODO',
     dueTime: toDateTimeLocalValue(task?.dueTime),
-    teamId: task?.teamId ? String(task.teamId) : '',
-    assigneeId: task?.assigneeId ? String(task.assigneeId) : '',
+    teamId: task?.teamId || task?.assignedTeamId ? String(task.teamId || task.assignedTeamId) : '',
+    assigneeId: task?.assigneeId || task?.assignedToUserId ? String(task.assigneeId || task.assignedToUserId) : '',
     progress: task?.progress != null ? String(task.progress) : '0',
   }
 }

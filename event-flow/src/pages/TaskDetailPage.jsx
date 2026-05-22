@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, FileText, Paperclip, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { ArrowLeft, FileText, MessageSquareText, Paperclip, Star, Trash2, Upload } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { attachmentApi, taskApi } from '../api'
@@ -10,6 +10,7 @@ import Spinner from '../components/ui/Spinner'
 import EventCaseLayout from '../features/events/EventCaseLayout'
 import TeamCaseLayout from '../features/teams/TeamCaseLayout'
 import { statusVariant } from '../features/organizations/organizationConstants'
+import useAutoReload from '../hooks/useAutoReload'
 import { getErrorMessage } from '../utils'
 import { formatDateTime } from '../utils/dateFormat'
 
@@ -46,6 +47,8 @@ function TaskDetailContent({ taskId, backPath, onError, onSuccess }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId])
 
+  useAutoReload(loadTask)
+
   async function handleUpload(file) {
     if (!file) return
     setIsUploading(true)
@@ -81,6 +84,8 @@ function TaskDetailContent({ taskId, backPath, onError, onSuccess }) {
   }
 
   const deadline = task?.dueTime || task?.deadline || task?.dueDate
+  const feedbackPath = `${backPath}/${taskId}/feedback`
+  const canFeedback = task?.status === 'DONE'
 
   return (
     <div className="space-y-4">
@@ -91,9 +96,6 @@ function TaskDetailContent({ taskId, backPath, onError, onSuccess }) {
             <h1 className="mt-1 text-2xl font-bold text-neutral-900">{task?.title || 'Đang tải công việc...'}</h1>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" leftIcon={<RefreshCw size={16} />} onClick={loadTask} loading={isLoading}>
-              Tải lại
-            </Button>
             <Button type="button" variant="secondary" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
               Quay lại danh sách
             </Button>
@@ -122,6 +124,31 @@ function TaskDetailContent({ taskId, backPath, onError, onSuccess }) {
               <Info label="Người phụ trách" value={task.assignedTo || task.assigneeName || 'Chưa có'} />
               <Info label="Hạn hoàn thành" value={formatDateTime(deadline)} />
             </div>
+          </Card>
+
+          <Card title="Feedback">
+            {(task.feedback || []).length === 0 ? (
+              <div className="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
+                Chưa có feedback cho công việc này
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(task.feedback || []).map((feedback) => (
+                  <div key={feedback.id} className="rounded-lg border border-neutral-200 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold text-neutral-900">{feedback.title || 'Feedback'}</p>
+                      {feedback.rating != null ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700">
+                          <Star size={14} />
+                          {feedback.rating}/5
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-neutral-600">{feedback.content || 'Không có nội dung'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
           <Card
@@ -175,6 +202,12 @@ function TaskDetailContent({ taskId, backPath, onError, onSuccess }) {
               </div>
             )}
           </Card>
+
+          <div className="flex justify-end">
+            <Button type="button" leftIcon={<MessageSquareText size={16} />} onClick={() => navigate(feedbackPath)} disabled={!canFeedback}>
+              Gửi feedback
+            </Button>
+          </div>
         </>
       ) : null}
     </div>

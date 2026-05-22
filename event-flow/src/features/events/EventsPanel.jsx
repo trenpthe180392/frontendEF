@@ -1,4 +1,4 @@
-import { CalendarDays, Eye, EyeOff, MapPin, Pencil, Plus, RefreshCw, Trash2, Users, Wallet, X } from 'lucide-react'
+import { CalendarDays, Eye, EyeOff, MapPin, Pencil, Plus, Trash2, Users, Wallet, X } from 'lucide-react'
 
 import ConfirmDialog from '../../components/feedback/ConfirmDialog'
 import FormField from '../../components/form/FormField'
@@ -36,7 +36,6 @@ function EventsPanel({
   onConfirmDelete,
   onCloseCancel,
   onConfirmCancel,
-  onReload,
   formatDateTime,
 }) {
   const isEditing = Boolean(editingEvent)
@@ -54,9 +53,6 @@ function EventsPanel({
               onClick={isEditing ? onCancelEdit : isEventFormOpen ? onToggleForm : onCreate}
             >
                 {isEventFormOpen ? 'Đóng form' : 'Tạo sự kiện'}
-            </Button>
-            <Button variant="secondary" size="sm" leftIcon={<RefreshCw size={16} />} onClick={onReload}>
-              Tải lại
             </Button>
           </div>
         }
