@@ -3,12 +3,13 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Lock, Mail, Phone, User, Zap } from 'lucide-react'
 
 import { authApi } from '../../api'
+import { getApiMessage } from '../../api/response'
 import AlertBanner from '../../components/feedback/AlertBanner'
 import FormField from '../../components/form/FormField'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import useAuthStore from '../../store/authStore'
-import { getErrorMessage } from '../../utils'
+import { getErrorMessage, getFieldErrors } from '../../utils'
 
 const defaultForm = {
   userName: '',
@@ -44,7 +45,7 @@ function RegisterPage() {
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const phonePattern = /^[0-9+\-\s]{8,20}$/
 
-    if (!form.userName.trim()) nextErrors.userName = 'Vui lòng nhập họ tên'
+    if (!form.userName.trim()) nextErrors.userName = 'Vui lòng nhập tên người dùng'
     if (!form.email.trim()) {
       nextErrors.email = 'Vui lòng nhập email'
     } else if (!emailPattern.test(form.email.trim())) {
@@ -86,7 +87,7 @@ function RegisterPage() {
         password: form.password,
       })
       setForm(defaultForm)
-      const message = response.data || 'Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP.'
+      const message = getApiMessage(response, 'Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP.')
       setSuccessMessage(message)
       navigate('/verify-otp', {
         state: {
@@ -95,6 +96,8 @@ function RegisterPage() {
         },
       })
     } catch (err) {
+      const fieldErrors = getFieldErrors(err)
+      setErrors((current) => ({ ...current, ...fieldErrors }))
       setError(getErrorMessage(err))
     } finally {
       setIsLoading(false)
@@ -126,7 +129,7 @@ function RegisterPage() {
             <AlertBanner variant="success" message={successMessage} />
 
             <form className="space-y-4" onSubmit={handleSubmit}>
-              <FormField label="Họ tên" required error={errors.userName}>
+              <FormField label="Tên người dùng" required error={errors.userName}>
                 <Input
                   name="userName"
                   autoComplete="name"
@@ -134,8 +137,9 @@ function RegisterPage() {
                   onChange={handleChange}
                   error={errors.userName}
                   leftIcon={<User size={16} />}
-                  placeholder="Nguyễn Văn A"
+                  placeholder="nguyenvana"
                 />
+                <p className="mt-1 text-xs text-neutral-500">Tên duy nhất dùng để nhận diện tài khoản; không thể trùng người dùng đang đăng ký hoặc đã kích hoạt.</p>
               </FormField>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

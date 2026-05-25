@@ -1,3 +1,5 @@
+import { cn } from '../../utils'
+
 const variantClasses = {
   success: 'bg-success-bg text-success',
   warning: 'bg-warning-bg text-warning',
@@ -9,11 +11,12 @@ const variantClasses = {
 /**
  * @param {object} props
  * @param {'success'|'warning'|'danger'|'info'|'default'} props.variant
+ * @param {string} props.className
  * @param {import('react').ReactNode} props.children
  */
-function Badge({ variant = 'default', children }) {
+function Badge({ variant = 'default', className = '', children }) {
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${variantClasses[variant]}`}>
+    <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', variantClasses[variant] || variantClasses.default, className)}>
       {children}
     </span>
   )

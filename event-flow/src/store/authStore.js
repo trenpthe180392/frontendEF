@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 
-import { clearToken, getToken, setToken } from '../services/tokenService'
+import { clearToken, getActiveToken, setToken } from '../services/tokenService'
+
+const initialToken = getActiveToken()
 
 const useAuthStore = create((set) => ({
   user: null,
-  token: getToken(),
-  isAuthenticated: Boolean(getToken()),
+  token: initialToken,
+  isAuthenticated: Boolean(initialToken),
 
   setAuth: (user, token) => {
     setToken(token)

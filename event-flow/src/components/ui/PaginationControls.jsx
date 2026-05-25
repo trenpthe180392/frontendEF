@@ -2,17 +2,12 @@ import { useEffect, useState } from 'react'
 
 import Button from './Button'
 import Input from './Input'
+import Select from './Select'
 
 function clampPage(page, totalPages) {
   const parsed = Number(page)
   if (!Number.isFinite(parsed)) return 1
   return Math.min(Math.max(Math.trunc(parsed), 1), Math.max(totalPages, 1))
-}
-
-function clampPageSize(size) {
-  const parsed = Number(size)
-  if (!Number.isFinite(parsed)) return 10
-  return Math.min(Math.max(Math.trunc(parsed), 1), 100)
 }
 
 function getVisiblePages(currentPage, totalPages) {
@@ -24,29 +19,18 @@ function getVisiblePages(currentPage, totalPages) {
 
 function PaginationControls({ currentPage, totalPages, pageSize, onPageChange, onPageSizeChange }) {
   const [pageInput, setPageInput] = useState(String(currentPage))
-  const [pageSizeInput, setPageSizeInput] = useState(String(pageSize || 10))
   const visiblePages = getVisiblePages(currentPage, totalPages)
+  const pageSizes = [10, 25, 50]
 
   useEffect(() => {
     setPageInput(String(currentPage))
   }, [currentPage])
-
-  useEffect(() => {
-    setPageSizeInput(String(pageSize || 10))
-  }, [pageSize])
 
   function goToInputPage(event) {
     event.preventDefault()
     const nextPage = clampPage(pageInput, totalPages)
     setPageInput(String(nextPage))
     onPageChange(nextPage)
-  }
-
-  function changePageSize(event) {
-    event.preventDefault()
-    const nextPageSize = clampPageSize(pageSizeInput)
-    setPageSizeInput(String(nextPageSize))
-    onPageSizeChange?.(nextPageSize)
   }
 
   if (totalPages <= 1 && !onPageSizeChange) return null
@@ -58,25 +42,21 @@ function PaginationControls({ currentPage, totalPages, pageSize, onPageChange, o
       </p>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
         {onPageSizeChange ? (
-          <form className="flex items-center gap-2" onSubmit={changePageSize}>
+          <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-neutral-600" htmlFor="pagination-size-input">
               Số hàng/trang
             </label>
-            <Input
+            <Select
               id="pagination-size-input"
               className="h-9 w-20"
-              min="1"
-              max="100"
-              type="number"
-              value={pageSizeInput}
-              onChange={(event) => setPageSizeInput(event.target.value)}
-            />
-            <Button type="submit" variant="secondary" size="sm">
-              Áp dụng
-            </Button>
-          </form>
+              value={pageSize || 10}
+              onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
+            >
+              {pageSizes.map((size) => <option key={size} value={size}>{size}</option>)}
+            </Select>
+          </div>
         ) : null}
-        <form className="flex items-center gap-2" onSubmit={goToInputPage}>
+        {totalPages > 7 ? <form className="flex items-center gap-2" onSubmit={goToInputPage}>
           <label className="text-sm font-medium text-neutral-600" htmlFor="pagination-page-input">
             Đến trang
           </label>
@@ -92,7 +72,7 @@ function PaginationControls({ currentPage, totalPages, pageSize, onPageChange, o
           <Button type="submit" variant="secondary" size="sm">
             Đi
           </Button>
-        </form>
+        </form> : null}
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => onPageChange(currentPage - 1)}>
             Trước

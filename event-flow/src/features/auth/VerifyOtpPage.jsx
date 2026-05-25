@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { KeyRound, Mail, Zap } from 'lucide-react'
 
 import { authApi } from '../../api'
+import { getApiMessage } from '../../api/response'
 import AlertBanner from '../../components/feedback/AlertBanner'
 import FormField from '../../components/form/FormField'
 import Button from '../../components/ui/Button'
@@ -58,7 +59,7 @@ function VerifyOtpPage() {
         email: email.trim().toLowerCase(),
         otp: otp.trim(),
       })
-      setSuccessMessage(response.data || 'Xác thực thành công. Bạn có thể đăng nhập.')
+      setSuccessMessage(getApiMessage(response, 'Xác thực thành công. Bạn có thể đăng nhập.'))
       setOtp('')
       window.setTimeout(() => navigate('/login', { replace: true }), 900)
     } catch (err) {
@@ -81,7 +82,7 @@ function VerifyOtpPage() {
 
     try {
       const response = await authApi.resendOtp({ email: email.trim().toLowerCase() })
-      setSuccessMessage(response.data || 'Đã gửi lại OTP.')
+      setSuccessMessage(getApiMessage(response, 'Đã gửi lại OTP.'))
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -152,6 +153,10 @@ function VerifyOtpPage() {
             <Button type="button" variant="secondary" className="w-full" loading={isResending} onClick={handleResendOtp}>
               Gửi lại OTP
             </Button>
+
+            <p className="text-center text-xs text-neutral-500">
+              Nếu tên người dùng đã bị sử dụng trước khi xác thực, hãy quay lại đăng ký với tên khác bằng đúng email này.
+            </p>
 
             <div className="text-center text-sm text-neutral-500">
               Đã xác thực?{' '}
