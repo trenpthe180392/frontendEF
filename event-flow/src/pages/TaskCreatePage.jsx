@@ -247,6 +247,20 @@ function TaskCreateContent({ eventDetail, organizationId, eventId, teamId = null
     onSuccess(null)
 
     try {
+      if (parentTaskId) {
+        const response = await aiApi.createSubtasksFromParent(parentTaskId, { maxSubTasks: 5 })
+        const createdCount = response.data?.createdCount ?? response.data?.tasks?.length ?? 0
+        if (createdCount === 0) {
+          onSuccess('AI chưa tạo thêm công việc con mới cho công việc cha này')
+          return
+        }
+        setDrafts([])
+        setErrors({})
+        onSuccess(`AI đã tạo ${createdCount} công việc con từ công việc cha.`)
+        navigate(`${backPath}/${parentTaskId}`)
+        return
+      }
+
       const response = await aiApi.suggestTasks(eventId)
       const suggestions = response.data?.tasks || []
       const scopedSuggestions = teamId
@@ -348,7 +362,7 @@ function TaskCreateContent({ eventDetail, organizationId, eventId, teamId = null
           )}
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="secondary" size="sm" loading={isSuggesting} disabled={!canCreate} leftIcon={<Sparkles size={16} />} onClick={handleSuggestTask}>
-              Gợi ý AI
+              {isSubtaskCreate ? 'Tạo task con bằng AI' : 'Gợi ý AI'}
             </Button>
             <Button type="submit" variant="primary" size="sm" disabled={!canCreate} leftIcon={<Plus size={16} />}>
               Thêm công việc
@@ -420,7 +434,9 @@ function TaskCreateContent({ eventDetail, organizationId, eventId, teamId = null
             </div>
             {drafts.length === 0 ? (
               <div className="mt-4 rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
-                Chưa có công việc nháp. Nhập công việc rồi bấm Thêm công việc hoặc dùng Gợi ý AI.
+                {isSubtaskCreate
+                  ? 'Chưa có công việc nháp. Nhập công việc rồi bấm Thêm công việc, hoặc dùng AI để tạo task con trực tiếp.'
+                  : 'Chưa có công việc nháp. Nhập công việc rồi bấm Thêm công việc hoặc dùng Gợi ý AI.'}
               </div>
             ) : (
               <div className="mt-4 space-y-2">
