@@ -3,6 +3,11 @@ import { defaultEventForm } from './eventConstants'
 function toDateTimeLocalValue(value) {
   if (!value) return ''
 
+  const businessWallTime = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/.exec(String(value))
+  if (businessWallTime && !/[zZ]|[+-]\d{2}:\d{2}$/.test(String(value))) {
+    return businessWallTime[1]
+  }
+
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
 
@@ -25,6 +30,7 @@ export function createEventFormFromEvent(event) {
     capacity: event.capacity ? String(event.capacity) : '',
     estimatedBudget: event.estimatedBudget ? String(event.estimatedBudget) : '',
     visible: event.visible !== false,
+    permissionScope: event.permissionScope || 'ORG',
   }
 }
 
@@ -39,8 +45,9 @@ export function toEventPayload(form, organizationId, creatorId = null) {
     registrationStart: form.registrationStart || null,
     registrationDeadline: form.registrationDeadline || null,
     capacity: form.capacity ? Number(form.capacity) : null,
-    estimatedBudget: form.estimatedBudget ? Number(form.estimatedBudget) : null,
+    estimatedBudget: form.estimatedBudget ? form.estimatedBudget.trim() : null,
     visible: form.visible !== false,
+    permissionScope: form.permissionScope || 'ORG',
     organizationId,
     creatorId,
   }

@@ -69,16 +69,6 @@ function OrganizationForm({
           </FormField>
         </div>
 
-        <FormField label="Logo URL" error={errors.logoUrl}>
-          <Input
-            name="logoUrl"
-            value={form.logoUrl}
-            onChange={onChange}
-            error={errors.logoUrl}
-            placeholder="https://..."
-          />
-        </FormField>
-
         <FormField label="Mô tả" required error={errors.description}>
           <Textarea
             name="description"

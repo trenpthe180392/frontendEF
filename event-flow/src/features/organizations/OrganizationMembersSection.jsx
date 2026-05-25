@@ -29,11 +29,12 @@ function normalizeMemberPage(responseData, pageSize = DEFAULT_MEMBERS_PER_PAGE) 
     }
   }
 
+  const page = responseData?.page || {}
   return {
     content: responseData?.content || [],
-    totalElements: responseData?.totalElements || 0,
-    totalPages: Math.max(1, responseData?.totalPages || 1),
-    number: responseData?.number || 0,
+    totalElements: responseData?.totalElements ?? page.totalElements ?? 0,
+    totalPages: Math.max(1, responseData?.totalPages ?? page.totalPages ?? 1),
+    number: responseData?.number ?? page.number ?? 0,
   }
 }
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, BarChart3, Building2, CalendarDays, ClipboardList, GitBranch, LayoutDashboard, Users } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, BarChart3, Building2, CalendarDays, ClipboardList, CreditCard, GitBranch, Image, LayoutDashboard, Mail, Megaphone, ScanLine, TicketCheck, Users, Wallet } from 'lucide-react'
 import { NavLink, useNavigate, useParams } from 'react-router-dom'
 
-import { organizationApi } from '../../api'
+import { eventApi, organizationApi } from '../../api'
 import AlertBanner from '../../components/feedback/AlertBanner'
 import Card from '../../components/layout/Card'
 import PageHeader from '../../components/layout/PageHeader'
@@ -17,20 +17,29 @@ const organizationRoutes = [
   { to: 'members', label: 'Thành viên', icon: Users },
   { to: 'departments', label: 'Phòng ban', icon: GitBranch },
   { to: 'events', label: 'Sự kiện', icon: CalendarDays },
+  { to: 'branding', label: 'Branding', icon: Image },
+  { to: 'subscription', label: 'Billing', icon: CreditCard },
 ]
 
 const eventRoutes = [
-  { to: '', label: 'Thông tin', icon: Building2, end: true },
-  { to: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-  { to: 'calendar', label: 'Lịch', icon: CalendarDays },
-  { to: 'members', label: 'Thành viên', icon: Users },
-  { to: 'teams', label: 'Đội nhóm', icon: BarChart3 },
-  { to: 'tasks', label: 'Công việc', icon: ClipboardList },
+  { to: '', module: 'info', label: 'Thông tin', icon: Building2, end: true },
+  { to: 'dashboard', module: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
+  { to: 'finance', module: 'finance', label: 'Tài chính', icon: Wallet },
+  { to: 'landing-page', module: 'landing-page', label: 'Landing page', icon: Megaphone },
+  { to: 'email-campaigns', module: 'email-campaigns', label: 'Email', icon: Mail },
+  { to: 'check-in/attendees', module: 'check-in', label: 'Người tham dự', icon: TicketCheck },
+  { to: 'check-in/sessions', module: 'check-in', label: 'Phiên check-in', icon: ScanLine },
+  { to: 'calendar', module: 'calendar', label: 'Lịch', icon: CalendarDays },
+  { to: 'issues', module: 'issues', label: 'Issues', icon: AlertTriangle },
+  { to: 'members', module: 'members', label: 'Thành viên', icon: Users },
+  { to: 'teams', module: 'teams', label: 'Đội nhóm', icon: BarChart3 },
+  { to: 'tasks', module: 'tasks', label: 'Công việc', icon: ClipboardList },
 ]
 
 const teamRoutes = [
   { to: '', label: 'Tổng quan', icon: LayoutDashboard, end: true },
   { to: 'calendar', label: 'Lịch', icon: CalendarDays },
+  { to: 'issues', label: 'Issues', icon: AlertTriangle },
   { to: 'members', label: 'Thành viên', icon: Users },
   { to: 'tasks', label: 'Công việc', icon: ClipboardList },
 ]
@@ -40,6 +49,7 @@ function OrganizationCaseLayout({ children, error, successMessage, onError }) {
   const navigate = useNavigate()
   const [organization, setOrganization] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [accessContext, setAccessContext] = useState(null)
 
   const loadOrganization = useCallback(async () => {
     setIsLoading(true)
@@ -48,12 +58,18 @@ function OrganizationCaseLayout({ children, error, successMessage, onError }) {
     try {
       const response = await organizationApi.getById(organizationId)
       setOrganization(normalizeOrganization(response.data))
+      if (eventId) {
+        const accessResponse = await eventApi.getAccessContext(eventId)
+        setAccessContext(accessResponse.data)
+      } else {
+        setAccessContext(null)
+      }
     } catch (err) {
       onError(getErrorMessage(err))
     } finally {
       setIsLoading(false)
     }
-  }, [organizationId, onError])
+  }, [eventId, organizationId, onError])
 
   useEffect(() => {
     loadOrganization()
@@ -63,8 +79,8 @@ function OrganizationCaseLayout({ children, error, successMessage, onError }) {
     <main className="min-h-[calc(100vh-129px)] bg-neutral-100 p-6 text-neutral-700">
       <div className="mx-auto max-w-7xl space-y-6">
         <PageHeader
-          title={organization?.organizationName || 'Tổ chức'}
-          subtitle="Quản lý từng phần bằng route riêng, liên kết qua organizationId."
+          title={organization?.organizationName || 'Workspace'}
+          subtitle="Quản lý thông tin, thành viên, sự kiện và billing trong cùng một workspace."
           actions={
             <Button variant="secondary" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate('/organizations')}>
               Quay lại
@@ -107,7 +123,7 @@ function OrganizationCaseLayout({ children, error, successMessage, onError }) {
               </div>
               <div className="p-3">
               <SidebarSection
-                title="Tổ chức"
+                title="Workspace"
                 routes={organizationRoutes}
                 basePath={`/organizations/${organization.id}`}
               />
@@ -115,7 +131,7 @@ function OrganizationCaseLayout({ children, error, successMessage, onError }) {
               {eventId ? (
                 <SidebarSection
                   title="Sự kiện"
-                  routes={eventRoutes}
+                  routes={eventRoutes.filter((route) => !accessContext || accessContext.allowedModules?.includes(route.module))}
                   basePath={`/organizations/${organization.id}/events/${eventId}`}
                 />
               ) : null}

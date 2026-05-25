@@ -7,7 +7,9 @@ import Card from '../../components/layout/Card'
 import EmptyState from '../../components/layout/EmptyState'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import Select from '../../components/ui/Select'
 import Spinner from '../../components/ui/Spinner'
+import Textarea from '../../components/ui/Textarea'
 import { getErrorMessage } from '../../utils'
 import { formatCurrency, formatDateTime } from '../../utils/dateFormat'
 import { normalizeOrganizationEvent } from '../../utils/organizationMappers'
@@ -68,8 +70,67 @@ function EventCaseLayout({ children, error, successMessage, onError }) {
   )
 }
 
-export function EventInfoPanel({ eventDetail, organizationId }) {
+const eventStatusOptions = [
+  { value: 'DRAFT', label: 'Nháp' },
+  { value: 'PUBLISHED', label: 'Đã công bố' },
+  { value: 'ONGOING', label: 'Đang diễn ra' },
+  { value: 'COMPLETED', label: 'Hoàn thành' },
+]
+
+function getAllowedStatusOptions(currentStatus) {
+  const normalized = String(currentStatus || 'DRAFT').toUpperCase()
+  const nextByStatus = { DRAFT: 'PUBLISHED', PUBLISHED: 'ONGOING', ONGOING: 'COMPLETED' }
+  const allowed = new Set([normalized, nextByStatus[normalized]])
+  return eventStatusOptions.filter((option) => allowed.has(option.value))
+}
+
+export function EventInfoPanel({ eventDetail, organizationId, onError, onSuccess, onReload }) {
   const navigate = useNavigate()
+  const [statusDraft, setStatusDraft] = useState(String(eventDetail.status || 'draft').toUpperCase())
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelReasonError, setCancelReasonError] = useState('')
+  const [isCancelling, setIsCancelling] = useState(false)
+
+  async function handleUpdateStatus() {
+    if (!eventDetail?.eventId || statusDraft.toLowerCase() === eventDetail.status) return
+
+    setIsUpdatingStatus(true)
+    onError?.(null)
+    onSuccess?.(null)
+
+    try {
+      await eventApi.updateStatus(eventDetail.eventId, statusDraft)
+      onSuccess?.('Đã cập nhật trạng thái sự kiện')
+      await onReload?.()
+    } catch (err) {
+      onError?.(getErrorMessage(err))
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
+  async function handleCancelEvent() {
+    if (!cancelReason.trim()) {
+      setCancelReasonError('Vui lòng nhập lý do hủy sự kiện.')
+      return
+    }
+
+    setIsCancelling(true)
+    setCancelReasonError('')
+    onError?.(null)
+    onSuccess?.(null)
+
+    try {
+      await eventApi.cancel(eventDetail.eventId, cancelReason.trim())
+      onSuccess?.('Sự kiện đã được hủy và lưu lý do để đối soát.')
+      await onReload?.()
+    } catch (err) {
+      onError?.(getErrorMessage(err))
+    } finally {
+      setIsCancelling(false)
+    }
+  }
 
   return (
     <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
@@ -84,7 +145,7 @@ export function EventInfoPanel({ eventDetail, organizationId }) {
           </Button>
           <span className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-neutral-700">
             {eventDetail.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-            {eventDetail.visible ? 'Công khai' : 'Nội bộ'}
+            {eventDetail.visible && eventDetail.permissionScope === 'PUBLIC' ? 'Công khai' : 'Nội bộ'}
           </span>
         </div>
 
@@ -113,6 +174,59 @@ export function EventInfoPanel({ eventDetail, organizationId }) {
         <InfoPill icon={<CalendarDays size={16} />} label="Mở đăng ký" value={formatDateTime(eventDetail.registrationStart)} />
         <InfoPill icon={<CheckCircle2 size={16} />} label="Hạn đăng ký" value={formatDateTime(eventDetail.registrationDeadline)} />
         <InfoPill icon={<Wallet size={16} />} label="Ngân sách dự kiến" value={formatCurrency(eventDetail.estimatedBudget)} />
+      </div>
+      <div className="border-t border-neutral-100 p-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Trạng thái sự kiện</p>
+            <div className="mt-2 max-w-xs">
+              <Select value={statusDraft} onChange={(event) => setStatusDraft(event.target.value)}>
+                {getAllowedStatusOptions(eventDetail.status).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} ({option.value})
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <Button
+            type="button"
+            loading={isUpdatingStatus}
+            disabled={statusDraft.toLowerCase() === eventDetail.status || ['cancelled', 'deleted'].includes(eventDetail.status)}
+            onClick={handleUpdateStatus}
+          >
+            Cập nhật trạng thái
+          </Button>
+        </div>
+        {!['completed', 'cancelled', 'deleted'].includes(eventDetail.status) ? (
+          <div className="mt-5 rounded-xl border border-danger/20 bg-danger-bg p-4">
+            <p className="font-semibold text-neutral-900">Hủy sự kiện</p>
+            <p className="mt-1 text-sm text-neutral-600">Hủy là trạng thái kết thúc và phải lưu lý do phục vụ audit vận hành.</p>
+            <div className="mt-3">
+              <Textarea
+                value={cancelReason}
+                onChange={(event) => {
+                  setCancelReason(event.target.value)
+                  setCancelReasonError('')
+                }}
+                error={cancelReasonError}
+                placeholder="Lý do hủy sự kiện"
+              />
+              {cancelReasonError ? <p className="mt-1 text-sm text-danger">{cancelReasonError}</p> : null}
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button type="button" variant="danger" loading={isCancelling} onClick={handleCancelEvent}>
+                Hủy sự kiện
+              </Button>
+            </div>
+          </div>
+        ) : eventDetail.status === 'cancelled' ? (
+          <div className="mt-5 rounded-xl border border-danger/20 bg-danger-bg p-4 text-sm text-neutral-700">
+            <p className="font-semibold text-neutral-900">Sự kiện đã hủy</p>
+            <p className="mt-1">{eventDetail.cancelReason || 'Không có lý do được ghi nhận.'}</p>
+            {eventDetail.cancelledAt ? <p className="mt-1 text-neutral-500">Thời điểm hủy: {formatDateTime(eventDetail.cancelledAt)}</p> : null}
+          </div>
+        ) : null}
       </div>
     </section>
   )

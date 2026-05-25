@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { departmentApi, departmentMemberApi, organizationMemberApi } from '../../api'
+import { normalizePageResponse } from '../../api/response'
 import ConfirmDialog from '../../components/feedback/ConfirmDialog'
 import { getErrorMessage } from '../../utils'
 import { formatDateTime } from '../../utils/dateFormat'
@@ -26,6 +27,9 @@ function OrganizationDepartmentsSection({ organizationId, onError, onSuccess, on
   const [loadingDepartmentMembersId, setLoadingDepartmentMembersId] = useState(null)
   const [removingDepartmentMember, setRemovingDepartmentMember] = useState(null)
   const [pendingRemoveDepartmentMember, setPendingRemoveDepartmentMember] = useState(null)
+  const availableDepartmentMembers = selectedDepartment
+    ? members.filter((member) => !departmentMembers.some((departmentMember) => Number(departmentMember.userId) === Number(member.userId)))
+    : members
 
   useEffect(() => {
     async function loadDepartments() {
@@ -36,7 +40,11 @@ function OrganizationDepartmentsSection({ organizationId, onError, onSuccess, on
         ])
         const normalizedDepartments = (departmentsResponse.data || []).map(normalizeDepartment)
         setDepartments(normalizedDepartments)
-        setMembers((membersResponse.data || []).map(normalizeOrganizationMember))
+        setMembers(
+          normalizePageResponse(membersResponse.data, 100).items
+            .map(normalizeOrganizationMember)
+            .filter((member) => member.status === 'active')
+        )
         onCountChange?.(normalizedDepartments.length)
       } catch (err) {
         onError(getErrorMessage(err))
@@ -210,7 +218,7 @@ function OrganizationDepartmentsSection({ organizationId, onError, onSuccess, on
         departmentMembers={departmentMembers}
         departmentMemberForm={departmentMemberForm}
         departmentMemberErrors={departmentMemberErrors}
-        members={members}
+        members={availableDepartmentMembers}
         isDepartmentSubmitting={isDepartmentSubmitting}
         isDepartmentMemberSubmitting={isDepartmentMemberSubmitting}
         loadingDepartmentMembersId={loadingDepartmentMembersId}

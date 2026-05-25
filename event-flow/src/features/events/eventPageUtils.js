@@ -1,4 +1,5 @@
-export const eventRoleOptions = ['OWNER', 'LEADER', 'TEAM_LEADER', 'MEMBER']
+export const eventRoleOptions = ['OWNER', 'LEADER', 'MEMBER']
+export const eventCapabilityOptions = ['FINANCE_MANAGER', 'FINANCE_EXECUTOR', 'CHECKIN_OPERATOR']
 
 export const taskPriorityOptions = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 
@@ -9,16 +10,21 @@ export const teamRoleOptions = ['TEAM_LEADER', 'SUB_TEAM_LEADER', 'MEMBER']
 export const eventRoleLabels = {
   OWNER: 'Chủ sự kiện',
   LEADER: 'Trưởng sự kiện',
-  TEAM_LEADER: 'Trưởng đội',
   MEMBER: 'Thành viên',
   HOST: 'Chủ sự kiện',
   ORGANIZER: 'Trưởng sự kiện',
-  STAFF: 'Thành viên',
-  CHECKER: 'Thành viên',
+  STAFF: 'Nhân sự sự kiện',
+  CHECKER: 'Nhân sự check-in',
   ATTENDEE: 'Thành viên',
   ORG_ADMIN: 'Chủ sự kiện',
   FINANCE_MANAGER: 'Trưởng tài chính',
   FINANCE_EXECUTOR: 'Phụ trách tài chính đội',
+}
+
+export const eventCapabilityLabels = {
+  FINANCE_MANAGER: 'Quản lý tài chính',
+  FINANCE_EXECUTOR: 'Thực hiện giải ngân',
+  CHECKIN_OPERATOR: 'Vận hành check-in',
 }
 
 export const teamRoleLabels = {
@@ -36,6 +42,7 @@ export function normalizeEventMember(member) {
     userId: member.userId,
     userName: member.userName || `Người dùng ${member.userId}`,
     role: member.role || 'MEMBER',
+    capabilities: member.capabilities || [],
     status: String(member.status || 'ACTIVE').toLowerCase(),
     createAt: member.createAt,
   }

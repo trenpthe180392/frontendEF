@@ -10,6 +10,7 @@ export const defaultEventForm = {
   capacity: '',
   estimatedBudget: '',
   visible: true,
+  permissionScope: 'ORG',
 }
 
 export const eventTypeOptions = [

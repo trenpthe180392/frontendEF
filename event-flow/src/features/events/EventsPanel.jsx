@@ -58,7 +58,7 @@ function EventsPanel({
         }
       >
         {isEventFormOpen ? (
-          <form className="mb-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4" onSubmit={onSubmit}>
+          <form className="mb-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4" onSubmit={onSubmit} noValidate>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-base font-semibold text-neutral-900">{isEditing ? 'Cập nhật sự kiện' : 'Tạo sự kiện'}</h3>
               {isEditing ? (
@@ -136,6 +136,13 @@ function EventsPanel({
                   error={eventErrors.location}
                   placeholder="VD: Gem Center, TP.HCM"
                 />
+              </FormField>
+              <FormField label="Phạm vi hiển thị" error={eventErrors.permissionScope}>
+                <Select name="permissionScope" value={eventForm.permissionScope || 'ORG'} onChange={onChange} error={eventErrors.permissionScope}>
+                  <option value="ORG">Nội bộ workspace</option>
+                  <option value="PUBLIC">Công khai qua landing page</option>
+                  <option value="PRIVATE">Chỉ thành viên được cấp quyền</option>
+                </Select>
               </FormField>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -224,7 +231,7 @@ function EventsPanel({
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-700">
                           {event.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                          {event.visible ? 'Công khai' : 'Nội bộ'}
+                          {event.visible && event.permissionScope === 'PUBLIC' ? 'Công khai' : 'Nội bộ'}
                         </span>
                       </div>
                       <h3 className="mt-3 line-clamp-2 text-xl font-bold leading-tight text-neutral-900">{event.name}</h3>

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { eventApi } from '../../api'
-import { getErrorMessage } from '../../utils'
+import { getApiMessage } from '../../api/response'
+import { getErrorMessage, getFieldErrors } from '../../utils'
 import { formatDateTime } from '../../utils/dateFormat'
 import useAutoReload from '../../hooks/useAutoReload'
 import { normalizeOrganizationEvent } from '../../utils/organizationMappers'
 import { defaultEventForm } from './eventConstants'
 import { createEventFormFromEvent, toEventPayload } from './eventMappers'
+import { validateEventForm as getEventFormErrors } from './eventValidation'
 import EventsPanel from './EventsPanel'
 
 function OrganizationEventsSection({ organizationId, onError, onSuccess, onCountChange }) {
@@ -50,29 +52,7 @@ function OrganizationEventsSection({ organizationId, onError, onSuccess, onCount
   }
 
   function validateEventForm() {
-    const nextErrors = {}
-
-    if (!eventForm.name.trim()) nextErrors.name = 'Vui lòng nhập tên event'
-    if (!eventForm.eventType) nextErrors.eventType = 'Vui lòng chọn loại event'
-    if (!eventForm.startTime) nextErrors.startTime = 'Vui lòng chọn thời gian bắt đầu'
-    if (!eventForm.endTime) nextErrors.endTime = 'Vui lòng chọn thời gian kết thúc'
-
-    if (eventForm.startTime && eventForm.endTime && new Date(eventForm.endTime) <= new Date(eventForm.startTime)) {
-      nextErrors.endTime = 'Thời gian kết thúc phải sau thời gian bắt đầu'
-    }
-
-    if (
-      eventForm.registrationStart &&
-      eventForm.registrationDeadline &&
-      new Date(eventForm.registrationDeadline) <= new Date(eventForm.registrationStart)
-    ) {
-      nextErrors.registrationDeadline = 'Hạn đăng ký phải sau thời gian mở đăng ký'
-    }
-
-    if (eventForm.capacity && Number(eventForm.capacity) < 1) nextErrors.capacity = 'Capacity tối thiểu là 1'
-    if (eventForm.estimatedBudget && Number(eventForm.estimatedBudget) < 0) {
-      nextErrors.estimatedBudget = 'Ngân sách không được âm'
-    }
+    const nextErrors = getEventFormErrors(eventForm)
 
     setEventErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -101,6 +81,10 @@ function OrganizationEventsSection({ organizationId, onError, onSuccess, onCount
       setIsEventFormOpen(false)
       onSuccess(editingEvent ? 'Đã cập nhật event' : 'Đã tạo event')
     } catch (err) {
+      const fieldErrors = getFieldErrors(err)
+      if (Object.keys(fieldErrors).length > 0) {
+        setEventErrors((current) => ({ ...current, ...fieldErrors }))
+      }
       onError(getErrorMessage(err))
     } finally {
       setIsEventSubmitting(false)
@@ -115,14 +99,14 @@ function OrganizationEventsSection({ organizationId, onError, onSuccess, onCount
     onSuccess(null)
 
     try {
-      await eventApi.cancel(pendingCancelEvent.eventId)
+      const response = await eventApi.cancel(pendingCancelEvent.eventId)
       setEvents((current) =>
         current.map((item) =>
           item.eventId === pendingCancelEvent.eventId ? { ...item, status: 'cancelled' } : item
         )
       )
       setPendingCancelEvent(null)
-      onSuccess('Đã hủy event')
+      onSuccess(getApiMessage(response, 'Đã hủy event'))
     } catch (err) {
       onError(getErrorMessage(err))
     } finally {
@@ -138,7 +122,7 @@ function OrganizationEventsSection({ organizationId, onError, onSuccess, onCount
     onSuccess(null)
 
     try {
-      await eventApi.delete(pendingDeleteEvent.eventId)
+      const response = await eventApi.delete(pendingDeleteEvent.eventId)
       setEvents((current) => {
         const next = current.filter((item) => item.eventId !== pendingDeleteEvent.eventId)
         onCountChange?.(next.length)
@@ -151,7 +135,7 @@ function OrganizationEventsSection({ organizationId, onError, onSuccess, onCount
         setIsEventFormOpen(false)
       }
       setPendingDeleteEvent(null)
-      onSuccess('Đã xóa event')
+      onSuccess(getApiMessage(response, 'Đã xóa event'))
     } catch (err) {
       onError(getErrorMessage(err))
     } finally {

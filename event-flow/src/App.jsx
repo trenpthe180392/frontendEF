@@ -5,12 +5,19 @@ import AboutPage from './pages/AboutPage'
 import DepartmentCreatePage from './pages/DepartmentCreatePage'
 import EventCalendarCreatePage from './pages/EventCalendarCreatePage'
 import EventCalendarPage from './pages/EventCalendarPage'
+import EventCheckInAttendeesPage from './pages/EventCheckInAttendeesPage'
+import EventCheckInScannerPage from './pages/EventCheckInScannerPage'
+import EventCheckInSessionsPage from './pages/EventCheckInSessionsPage'
 import EventCreatePage from './pages/EventCreatePage'
 import EventDashboardPage from './pages/EventDashboardPage'
+import EventFinanceDashboardPage from './pages/EventFinanceDashboardPage'
+import EmailCampaignsPage from './pages/EmailCampaignsPage'
 import EventInfoPage from './pages/EventInfoPage'
+import EventLandingPageEditorPage from './pages/EventLandingPageEditorPage'
 import EventMembersPage from './pages/EventMembersPage'
 import EventTasksPage from './pages/EventTasksPage'
 import EventTeamsPage from './pages/EventTeamsPage'
+import { EventIssuesPage, TeamIssuesPage } from './pages/IssueListPage'
 import TeamCalendarCreatePage from './pages/TeamCalendarCreatePage'
 import TeamCalendarPage from './pages/TeamCalendarPage'
 import TeamCreatePage from './pages/TeamCreatePage'
@@ -24,10 +31,16 @@ import TaskFeedbackPage from './pages/TaskFeedbackPage'
 import LoginPage from './features/auth/LoginPage'
 import RegisterPage from './features/auth/RegisterPage'
 import VerifyOtpPage from './features/auth/VerifyOtpPage'
+import AuthConfirmPage from './pages/AuthConfirmPage'
+import InvitationConfirmPage from './pages/InvitationConfirmPage'
 import OAuth2SuccessPage from './pages/OAuth2SuccessPage'
 import MemberProfilePage from './pages/MemberProfilePage'
+import PricingPage from './pages/PricingPage'
 import ProfilePage from './pages/ProfilePage'
+import PublicEmailUnsubscribePage from './pages/PublicEmailUnsubscribePage'
+import PublicEventPage from './pages/PublicEventPage'
 import OrganizationDepartmentsPage from './pages/OrganizationDepartmentsPage'
+import OrganizationBrandingPage from './pages/OrganizationBrandingPage'
 import OrganizationDetailPage from './pages/OrganizationDetailPage'
 import OrganizationEventsPage from './pages/OrganizationEventsPage'
 import OrganizationMemberInvitePage from './pages/OrganizationMemberInvitePage'
@@ -44,11 +57,17 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-otp" element={<VerifyOtpPage />} />
+        <Route path="/auth/confirm" element={<AuthConfirmPage />} />
+        <Route path="/invitations/confirm" element={<InvitationConfirmPage />} />
         <Route path="/oauth2/success" element={<OAuth2SuccessPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/public/email/unsubscribe" element={<PublicEmailUnsubscribePage />} />
+        <Route path="/public/events/:slug" element={<PublicEventPage />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
             <Route path="/organizations" element={<OrganizationsPage />} />
             <Route path="/subscription" element={<SubscriptionPage />} />
+            <Route path="/organizations/:organizationId/subscription" element={<SubscriptionPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/organizations/:organizationId" element={<OrganizationDetailPage />} />
@@ -58,12 +77,20 @@ function App() {
             <Route path="/organizations/:organizationId/members/:userId" element={<MemberProfilePage />} />
             <Route path="/organizations/:organizationId/departments/create" element={<DepartmentCreatePage />} />
             <Route path="/organizations/:organizationId/departments" element={<OrganizationDepartmentsPage />} />
+            <Route path="/organizations/:organizationId/branding" element={<OrganizationBrandingPage />} />
             <Route path="/organizations/:organizationId/events/create" element={<EventCreatePage />} />
             <Route path="/organizations/:organizationId/events" element={<OrganizationEventsPage />} />
             <Route path="/organizations/:organizationId/events/:eventId" element={<EventInfoPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/dashboard" element={<EventDashboardPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/finance" element={<EventFinanceDashboardPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/email-campaigns" element={<EmailCampaignsPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/landing-page" element={<EventLandingPageEditorPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/check-in/attendees" element={<EventCheckInAttendeesPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/check-in/sessions" element={<EventCheckInSessionsPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/check-in/scanner" element={<EventCheckInScannerPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/calendar/create" element={<EventCalendarCreatePage />} />
             <Route path="/organizations/:organizationId/events/:eventId/calendar" element={<EventCalendarPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/issues" element={<EventIssuesPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/members" element={<EventMembersPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/members/:userId" element={<MemberProfilePage />} />
             <Route path="/organizations/:organizationId/events/:eventId/teams/create" element={<TeamCreatePage />} />
@@ -72,6 +99,7 @@ function App() {
             <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/dashboard" element={<TeamDashboardPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/calendar/create" element={<TeamCalendarCreatePage />} />
             <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/calendar" element={<TeamCalendarPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/issues" element={<TeamIssuesPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/members" element={<TeamMembersPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/members/:userId" element={<MemberProfilePage />} />
             <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/tasks" element={<TeamTasksPage />} />
