@@ -4,6 +4,8 @@ export const organizationMemberApi = {
   getByOrganization: (organizationId, params) => apiClient.get(`/organization-members/${organizationId}`, { params }),
   getInvitations: (organizationId) =>
     apiClient.get(`/organization-members/invitations/organization/${organizationId}`),
+  confirmInvitation: (token) =>
+    apiClient.get('/organization-members/invitations/confirm', { params: { token } }),
   add: (data) => apiClient.post('/organization-members', data),
   updateInvitation: (invitationId, data) =>
     apiClient.patch(`/organization-members/invitations/${invitationId}`, data),

@@ -3,6 +3,8 @@ import { ArrowLeft, Plus, Sparkles, Users, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { aiApi, eventMemberApi, teamApi } from '../api'
+import { normalizePageResponse } from '../api/response'
+import SubscriptionGateBanner from '../components/feedback/SubscriptionGateBanner'
 import FormField from '../components/form/FormField'
 import Card from '../components/layout/Card'
 import Badge from '../components/ui/Badge'
@@ -12,7 +14,7 @@ import Select from '../components/ui/Select'
 import Textarea from '../components/ui/Textarea'
 import EventCaseLayout, { EventWorkspaceHeader } from '../features/events/EventCaseLayout'
 import { normalizeEventMember, teamRoleLabels, teamRoleOptions } from '../features/events/eventPageUtils'
-import { getErrorMessage } from '../utils'
+import { getErrorMessage, isSubscriptionGateError } from '../utils'
 
 const emptyTeamForm = {
   name: '',
@@ -30,6 +32,7 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
   const [initialMembers, setInitialMembers] = useState([])
   const [form, setForm] = useState(emptyTeamForm)
   const [errors, setErrors] = useState({})
+  const [subscriptionGateError, setSubscriptionGateError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
 
@@ -37,7 +40,7 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
     async function loadMembers() {
       try {
         const response = await eventMemberApi.getByEvent(eventId)
-        setEventMembers((response.data || []).map(normalizeEventMember))
+        setEventMembers(normalizePageResponse(response.data, 100).items.map(normalizeEventMember))
       } catch (err) {
         onError(getErrorMessage(err))
       }
@@ -50,6 +53,7 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
     const { name, type, checked, value } = event.target
     setForm((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
     setErrors((current) => ({ ...current, [name]: null }))
+    setSubscriptionGateError(null)
     onSuccess(null)
   }
 
@@ -82,6 +86,7 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
 
   async function handleSuggestTeam() {
     setIsSuggesting(true)
+    setSubscriptionGateError(null)
     onError(null)
     onSuccess(null)
 
@@ -107,7 +112,11 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
       setErrors({})
       onSuccess('AI đã điền gợi ý đội nhóm. Kiểm tra rồi lưu để tạo.')
     } catch (err) {
-      onError(getErrorMessage(err))
+      if (isSubscriptionGateError(err)) {
+        setSubscriptionGateError(err)
+      } else {
+        onError(getErrorMessage(err))
+      }
     } finally {
       setIsSuggesting(false)
     }
@@ -118,6 +127,7 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
     if (!validateForm()) return
 
     setIsSubmitting(true)
+    setSubscriptionGateError(null)
     onError(null)
     onSuccess(null)
 
@@ -158,6 +168,8 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
           </Button>
         }
       />
+
+      <SubscriptionGateBanner error={subscriptionGateError} organizationId={organizationId} />
 
       <Card title="Thông tin đội nhóm">
         <form className="space-y-4" onSubmit={handleSubmit}>

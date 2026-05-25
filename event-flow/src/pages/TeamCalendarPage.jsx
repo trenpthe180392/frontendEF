@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Link as LinkIcon, Plus } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, Eye, Link as LinkIcon, Plus } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { calendarApi } from '../api'
@@ -7,6 +7,7 @@ import Card from '../components/layout/Card'
 import EmptyState from '../components/layout/EmptyState'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import CalendarItemManager from '../features/calendar/CalendarItemManager'
 import {
   addCalendarMonths,
   buildCalendarMonthDays,
@@ -22,11 +23,12 @@ import TeamCaseLayout from '../features/teams/TeamCaseLayout'
 import { getErrorMessage } from '../utils'
 import { formatDateTime } from '../utils/dateFormat'
 
-function TeamCalendarContent({ organizationId, eventId, teamId, reloadKey, onError }) {
+function TeamCalendarContent({ organizationId, eventId, teamId, reloadKey, onError, onSuccess }) {
   const navigate = useNavigate()
   const [calendars, setCalendars] = useState([])
   const [selectedDate, setSelectedDate] = useState(null)
   const [monthAnchor, setMonthAnchor] = useState(() => new Date())
+  const [selectedCalendar, setSelectedCalendar] = useState(null)
 
   const monthDays = useMemo(() => buildCalendarMonthDays(monthAnchor), [monthAnchor])
   const selectedItems = selectedDate ? getCalendarItemsForDay(calendars, selectedDate) : []
@@ -60,6 +62,16 @@ function TeamCalendarContent({ organizationId, eventId, teamId, reloadKey, onErr
     navigate(`/organizations/${organizationId}/events/${eventId}/teams/${teamId}/calendar/create`, {
       state: { defaultDate: toDateKey(date) },
     })
+  }
+
+  async function handleCalendarChanged(updatedCalendar) {
+    setSelectedCalendar(updatedCalendar)
+    await loadCalendars()
+  }
+
+  async function handleCalendarDeleted() {
+    setSelectedCalendar(null)
+    await loadCalendars()
   }
 
   return (
@@ -114,7 +126,7 @@ function TeamCalendarContent({ organizationId, eventId, teamId, reloadKey, onErr
                   'min-h-[132px] border-b border-r border-neutral-200 p-2 text-left transition focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary',
                   selected ? 'border-primary bg-primary/10' : dayItems.length > 0 ? firstAccent.day : 'bg-white hover:bg-neutral-50',
                 ].join(' ')}
-                style={{ gridColumnStart: index === 0 ? ((day.date.getDay() + 6) % 7) + 1 : undefined }}
+                style={{ gridColumnStart: index === 0 ? ((day.date.getDay() + 6) % 7) + 1 : undefined }} /* Required for calendar grid alignment */
                 onClick={() => setSelectedDate(day.date)}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -140,49 +152,68 @@ function TeamCalendarContent({ organizationId, eventId, teamId, reloadKey, onErr
         </div>
       </Card>
 
-      <Card
-        title={selectedDate ? selectedDate.toLocaleDateString('vi-VN') : 'Thông tin ngày'}
-        headerRight={
-          <Button type="button" variant="secondary" size="sm" leftIcon={<Plus size={16} />} onClick={() => openCreatePage()}>
-            Thêm
-          </Button>
-        }
-      >
-        {selectedItems.length === 0 ? (
-          <EmptyState icon={<CalendarDays size={24} />} title="Ngày này chưa có lịch" description="Chọn ngày khác hoặc tạo lịch cho ngày đang xem." />
-        ) : (
-          <div className="space-y-3">
-            {selectedItems.map((item) => {
-              const accent = getCalendarAccent(item)
-              return (
-                <article key={item.id} className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-                  <div className={`h-1.5 ${accent.bar}`} />
-                  <div className="p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-neutral-900">{item.title}</p>
-                        <p className="mt-1 text-xs font-medium text-neutral-500">{item.type || 'TEAM'}</p>
+      <div className="space-y-4">
+        <Card
+          title={selectedDate ? selectedDate.toLocaleDateString('vi-VN') : 'Thông tin ngày'}
+          headerRight={
+            <Button type="button" variant="secondary" size="sm" leftIcon={<Plus size={16} />} onClick={() => openCreatePage()}>
+              Thêm
+            </Button>
+          }
+        >
+          {selectedItems.length === 0 ? (
+            <EmptyState icon={<CalendarDays size={24} />} title="Ngày này chưa có lịch" description="Chọn ngày khác hoặc tạo lịch cho ngày đang xem." />
+          ) : (
+            <div className="space-y-3">
+              {selectedItems.map((item) => {
+                const accent = getCalendarAccent(item)
+                return (
+                  <article key={item.id} className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+                    <div className={`h-1.5 ${accent.bar}`} />
+                    <div className="p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-neutral-900">{item.title}</p>
+                          <p className="mt-1 text-xs font-medium text-neutral-500">{item.type || 'TEAM'}</p>
+                        </div>
+                        <Badge variant="default">{calendarStatusLabels[item.status] || item.status || 'SCHEDULED'}</Badge>
                       </div>
-                      <Badge variant="default">{calendarStatusLabels[item.status] || item.status || 'SCHEDULED'}</Badge>
+                      <p className="mt-3 flex items-center gap-2 text-sm text-neutral-600">
+                        <Clock size={15} />
+                        {formatDateTime(item.startTime)} - {formatDateTime(item.endTime)}
+                      </p>
+                      {item.meetingUrl ? (
+                        <a className="mt-2 flex items-center gap-2 text-sm font-semibold text-primary" href={item.meetingUrl} target="_blank" rel="noreferrer">
+                          <LinkIcon size={15} />
+                          Meeting URL
+                        </a>
+                      ) : null}
+                      {item.description ? <p className="mt-3 text-sm leading-6 text-neutral-600">{item.description}</p> : null}
+                      <div className="mt-3 flex justify-end">
+                        <Button type="button" variant="secondary" size="sm" leftIcon={<Eye size={16} />} onClick={() => setSelectedCalendar(item)}>
+                          Xem/Sửa
+                        </Button>
+                      </div>
                     </div>
-                    <p className="mt-3 flex items-center gap-2 text-sm text-neutral-600">
-                      <Clock size={15} />
-                      {formatDateTime(item.startTime)} - {formatDateTime(item.endTime)}
-                    </p>
-                    {item.meetingUrl ? (
-                      <a className="mt-2 flex items-center gap-2 text-sm font-semibold text-primary" href={item.meetingUrl} target="_blank" rel="noreferrer">
-                        <LinkIcon size={15} />
-                        Meeting URL
-                      </a>
-                    ) : null}
-                    {item.description ? <p className="mt-3 text-sm leading-6 text-neutral-600">{item.description}</p> : null}
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        )}
-      </Card>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+
+        <Card title="Chi tiết lịch">
+          <CalendarItemManager
+            context="team"
+            eventId={eventId}
+            teamId={teamId}
+            selectedItem={selectedCalendar}
+            onChanged={handleCalendarChanged}
+            onDeleted={handleCalendarDeleted}
+            onSuccess={onSuccess}
+          />
+        </Card>
+      </div>
     </div>
   )
 }
@@ -210,6 +241,7 @@ function TeamCalendarPage() {
           teamId={Number(teamId)}
           reloadKey={location.state?.reloadAt}
           onError={setError}
+          onSuccess={setSuccessMessage}
         />
       )}
     </TeamCaseLayout>

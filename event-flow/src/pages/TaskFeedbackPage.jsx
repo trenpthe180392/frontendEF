@@ -3,6 +3,7 @@ import { ArrowLeft, MessageSquareText, Send, Star } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { feedbackApi, taskApi } from '../api'
+import { getApiMessage } from '../api/response'
 import FormField from '../components/form/FormField'
 import Card from '../components/layout/Card'
 import EmptyState from '../components/layout/EmptyState'
@@ -99,7 +100,7 @@ function TaskFeedbackContent({ organizationId, eventId, teamId = null, taskId, o
     onSuccess(null)
 
     try {
-      await feedbackApi.createForTask({
+      const response = await feedbackApi.createForTask({
         title: form.title.trim(),
         content: form.content.trim(),
         rating: Number(form.rating),
@@ -109,7 +110,7 @@ function TaskFeedbackContent({ organizationId, eventId, teamId = null, taskId, o
         eventId,
         newTaskStatus: form.newTaskStatus || null,
       })
-      onSuccess('Đã gửi feedback cho công việc')
+      onSuccess(getApiMessage(response, 'Đã gửi feedback cho công việc'))
       navigate(detailPath)
     } catch (err) {
       onError(getErrorMessage(err))

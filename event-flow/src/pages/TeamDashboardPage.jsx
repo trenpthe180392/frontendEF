@@ -10,11 +10,11 @@ import TeamCaseLayout from '../features/teams/TeamCaseLayout'
 import { getErrorMessage } from '../utils'
 
 const statusSeries = [
-  { key: 'todo', label: 'TODO', color: '#64748b' },
-  { key: 'inProgress', label: 'IN_PROGRESS', color: '#2563eb' },
-  { key: 'review', label: 'IN_REVIEW', color: '#f59e0b' },
-  { key: 'done', label: 'DONE', color: '#16a34a' },
-  { key: 'cancelled', label: 'CANCELLED', color: '#dc2626' },
+  { key: 'todo', label: 'TODO', color: 'var(--color-neutral-500)' },
+  { key: 'inProgress', label: 'IN_PROGRESS', color: 'var(--color-info)' },
+  { key: 'review', label: 'IN_REVIEW', color: 'var(--color-warning)' },
+  { key: 'done', label: 'DONE', color: 'var(--color-success)' },
+  { key: 'cancelled', label: 'CANCELLED', color: 'var(--color-danger)' },
 ]
 
 function TeamDashboardContent({ teamId, onError }) {
@@ -103,7 +103,7 @@ function MiniLineChart({ data }) {
       <svg className="h-[340px] w-full" viewBox="0 0 860 320" role="img" aria-label="Team task update line chart">
         {chart.yTicks.map((tick) => (
           <g key={tick.value}>
-            <line x1="56" x2="828" y1={tick.y} y2={tick.y} stroke="#e5e7eb" />
+            <line x1="56" x2="828" y1={tick.y} y2={tick.y} stroke="var(--color-neutral-300)" />
             <text x="44" y={tick.y + 4} textAnchor="end" className="fill-neutral-500 text-[11px]">
               {tick.value}
             </text>
@@ -117,8 +117,8 @@ function MiniLineChart({ data }) {
         {chart.lines.map((line) => (
           <polyline key={line.key} fill="none" stroke={line.color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" points={line.points} />
         ))}
-        <line x1="56" x2="828" y1="274" y2="274" stroke="#cbd5e1" />
-        <line x1="56" x2="56" y1="24" y2="274" stroke="#cbd5e1" />
+        <line x1="56" x2="828" y1="274" y2="274" stroke="var(--color-neutral-300)" />
+        <line x1="56" x2="56" y1="24" y2="274" stroke="var(--color-neutral-300)" />
       </svg>
     </div>
   )
@@ -133,7 +133,7 @@ function MiniColumnChart({ data }) {
         <svg className="h-full w-full text-neutral-500" viewBox="0 0 520 340" role="img" aria-label="Team task status column chart">
           {chart.yTicks.map((tick) => (
             <g key={tick.value}>
-              <line x1="54" x2="492" y1={tick.y} y2={tick.y} stroke="#e5e7eb" />
+              <line x1="54" x2="492" y1={tick.y} y2={tick.y} stroke="var(--color-neutral-300)" />
               <text x="44" y={tick.y + 4} textAnchor="end" className="fill-neutral-500 text-[11px]">
                 {tick.value}
               </text>
@@ -150,14 +150,14 @@ function MiniColumnChart({ data }) {
               </text>
             </g>
           ))}
-          <line x1="54" x2="492" y1="292" y2="292" stroke="#cbd5e1" />
-          <line x1="54" x2="54" y1="24" y2="292" stroke="#cbd5e1" />
+          <line x1="54" x2="492" y1="292" y2="292" stroke="var(--color-neutral-300)" />
+          <line x1="54" x2="54" y1="24" y2="292" stroke="var(--color-neutral-300)" />
         </svg>
       </div>
       <div className="flex flex-wrap gap-3">
         {chart.bars.map((bar) => (
           <div key={bar.status} className="flex items-center gap-2 text-xs font-semibold text-neutral-600">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: bar.color }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: 'var(--color-neutral-500)' }} />
             {bar.status}
           </div>
         ))}
@@ -203,7 +203,7 @@ function buildColumnChart(data) {
   const yMax = Math.max(5, Math.ceil(maxValue / 5) * 5)
   const gap = 18
   const barWidth = Math.min(58, (width - gap * (data.length + 1)) / Math.max(1, data.length))
-  const getColor = (status) => statusSeries.find((item) => item.label === status)?.color || '#64748b'
+  const getColor = (status) => statusSeries.find((item) => item.label === status)?.color || 'var(--color-neutral-500)'
 
   const bars = data.map((item, index) => {
     const count = Number(item.count || 0)

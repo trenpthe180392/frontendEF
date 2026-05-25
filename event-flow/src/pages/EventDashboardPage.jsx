@@ -3,6 +3,7 @@ import { Activity, BarChart3 } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 
 import { dashboardApi, teamApi } from '../api'
+import { normalizePageResponse } from '../api/response'
 import Card from '../components/layout/Card'
 import EmptyState from '../components/layout/EmptyState'
 import Select from '../components/ui/Select'
@@ -11,11 +12,11 @@ import EventCaseLayout, { EventWorkspaceHeader } from '../features/events/EventC
 import { getErrorMessage } from '../utils'
 
 const statusSeries = [
-  { key: 'todo', label: 'TODO', color: '#64748b' },
-  { key: 'inProgress', label: 'IN_PROGRESS', color: '#2563eb' },
-  { key: 'review', label: 'IN_REVIEW', color: '#f59e0b' },
-  { key: 'done', label: 'DONE', color: '#16a34a' },
-  { key: 'cancelled', label: 'CANCELLED', color: '#dc2626' },
+  { key: 'todo', label: 'TODO', color: 'var(--color-neutral-500)' },
+  { key: 'inProgress', label: 'IN_PROGRESS', color: 'var(--color-info)' },
+  { key: 'review', label: 'IN_REVIEW', color: 'var(--color-warning)' },
+  { key: 'done', label: 'DONE', color: 'var(--color-success)' },
+  { key: 'cancelled', label: 'CANCELLED', color: 'var(--color-danger)' },
 ]
 
 function EventDashboardContent({ eventId, onError }) {
@@ -36,7 +37,7 @@ function EventDashboardContent({ eventId, onError }) {
       try {
         const [dashboardResponse, teamsResponse] = await Promise.all([dashboardApi.getLeaderEvent(eventId), teamApi.getByEvent(eventId)])
         setDashboard(dashboardResponse.data)
-        setTeams(teamsResponse.data || [])
+        setTeams(normalizePageResponse(teamsResponse.data).items)
       } catch (err) {
         onError(getErrorMessage(err))
       } finally {
@@ -157,7 +158,7 @@ function StatusLineChart({ data, compact = false }) {
       <div className="flex flex-wrap gap-3">
         {statusSeries.map((series) => (
           <div key={series.key} className="flex items-center gap-2 text-xs font-semibold text-neutral-600">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: series.color }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: 'var(--color-neutral-500)' }} />
             {series.label}
           </div>
         ))}
@@ -167,7 +168,7 @@ function StatusLineChart({ data, compact = false }) {
         <svg className={compact ? 'h-[280px] w-full text-neutral-500' : 'h-[360px] w-full text-neutral-500'} viewBox="0 0 920 360" role="img" aria-label="Task status updates line chart">
           {chart.yTicks.map((tick) => (
             <g key={tick.value}>
-              <line x1="60" x2="890" y1={tick.y} y2={tick.y} stroke="#e5e7eb" strokeWidth="1" />
+              <line x1="60" x2="890" y1={tick.y} y2={tick.y} stroke="var(--color-neutral-300)" strokeWidth="1" />
               <text x="48" y={tick.y + 4} textAnchor="end" className="fill-neutral-500 text-[11px]">
                 {tick.value}
               </text>
@@ -189,8 +190,8 @@ function StatusLineChart({ data, compact = false }) {
             </g>
           ))}
 
-          <line x1="60" x2="890" y1="306" y2="306" stroke="#cbd5e1" strokeWidth="1" />
-          <line x1="60" x2="60" y1="24" y2="306" stroke="#cbd5e1" strokeWidth="1" />
+          <line x1="60" x2="890" y1="306" y2="306" stroke="var(--color-neutral-300)" strokeWidth="1" />
+          <line x1="60" x2="60" y1="24" y2="306" stroke="var(--color-neutral-300)" strokeWidth="1" />
         </svg>
       </div>
     </div>
@@ -206,7 +207,7 @@ function StatusColumnChart({ data, compact = false }) {
         <svg className="h-full w-full text-neutral-500" viewBox="0 0 520 360" role="img" aria-label="Task status count column chart">
           {chart.yTicks.map((tick) => (
             <g key={tick.value}>
-              <line x1="54" x2="492" y1={tick.y} y2={tick.y} stroke="#e5e7eb" strokeWidth="1" />
+              <line x1="54" x2="492" y1={tick.y} y2={tick.y} stroke="var(--color-neutral-300)" strokeWidth="1" />
               <text x="44" y={tick.y + 4} textAnchor="end" className="fill-neutral-500 text-[11px]">
                 {tick.value}
               </text>
@@ -225,15 +226,15 @@ function StatusColumnChart({ data, compact = false }) {
             </g>
           ))}
 
-          <line x1="54" x2="492" y1="306" y2="306" stroke="#cbd5e1" strokeWidth="1" />
-          <line x1="54" x2="54" y1="24" y2="306" stroke="#cbd5e1" strokeWidth="1" />
+          <line x1="54" x2="492" y1="306" y2="306" stroke="var(--color-neutral-300)" strokeWidth="1" />
+          <line x1="54" x2="54" y1="24" y2="306" stroke="var(--color-neutral-300)" strokeWidth="1" />
         </svg>
       </div>
 
       <div className="flex flex-wrap gap-3">
         {chart.bars.map((bar) => (
           <div key={bar.status} className="flex items-center gap-2 text-xs font-semibold text-neutral-600">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: bar.color }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: 'var(--color-neutral-500)' }} />
             {bar.status}
           </div>
         ))}
@@ -304,7 +305,7 @@ function buildColumnChart(data) {
   const barWidth = Math.min(58, (width - gap * (data.length + 1)) / Math.max(1, data.length))
   const getColor = (status) => {
     const series = statusSeries.find((item) => item.label === status)
-    return series?.color || '#64748b'
+    return series?.color || 'var(--color-neutral-500)'
   }
 
   const bars = data.map((item, index) => {

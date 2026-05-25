@@ -3,6 +3,7 @@ import { Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { aiApi, eventMemberApi, teamApi } from '../api'
+import { normalizePageResponse } from '../api/response'
 import ConfirmDialog from '../components/feedback/ConfirmDialog'
 import FormField from '../components/form/FormField'
 import Card from '../components/layout/Card'
@@ -40,11 +41,12 @@ function normalizeTeamPage(responseData, pageSize = DEFAULT_TEAMS_PER_PAGE) {
     }
   }
 
+  const page = responseData?.page || {}
   return {
     content: responseData?.content || [],
-    totalElements: responseData?.totalElements || 0,
-    totalPages: Math.max(1, responseData?.totalPages || 1),
-    number: responseData?.number || 0,
+    totalElements: responseData?.totalElements ?? page.totalElements ?? 0,
+    totalPages: Math.max(1, responseData?.totalPages ?? page.totalPages ?? 1),
+    number: responseData?.number ?? page.number ?? 0,
   }
 }
 
@@ -78,7 +80,7 @@ function EventTeamsContent({ organizationId, eventId, onError, onSuccess }) {
       setTotalElements(teamPage.totalElements)
       setTotalPages(teamPage.totalPages)
       setCurrentPage(teamPage.number + 1)
-      setEventMembers((membersResponse.data || []).map(normalizeEventMember))
+      setEventMembers(normalizePageResponse(membersResponse.data, 100).items.map(normalizeEventMember))
     } catch (err) {
       onError(getErrorMessage(err))
     }

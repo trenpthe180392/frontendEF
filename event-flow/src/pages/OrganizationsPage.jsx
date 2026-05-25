@@ -5,12 +5,13 @@ import { useNavigate } from 'react-router-dom'
 import AlertBanner from '../components/feedback/AlertBanner'
 import Button from '../components/ui/Button'
 import { organizationApi } from '../api'
-import { getErrorMessage } from '../utils'
+import { getErrorMessage, getFieldErrors } from '../utils'
 import { normalizeOrganization } from '../utils/organizationMappers'
 import OrganizationForm from '../features/organizations/OrganizationForm'
 import OrganizationList from '../features/organizations/OrganizationList'
 import { defaultForm, organizationHeroImage } from '../features/organizations/organizationConstants'
 import useAutoReload from '../hooks/useAutoReload'
+import { getTokenUserId } from '../services/tokenService'
 
 function OrganizationsPage() {
   const navigate = useNavigate()
@@ -87,6 +88,12 @@ function OrganizationsPage() {
     event.preventDefault()
     if (!validateForm()) return
 
+    const createdByUserId = getTokenUserId()
+    if (!createdByUserId) {
+      setError('Phiên đăng nhập chưa có mã người dùng. Vui lòng đăng xuất rồi đăng nhập lại để tạo tổ chức.')
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
     setSuccessMessage(null)
@@ -96,9 +103,10 @@ function OrganizationsPage() {
         organizationName: form.organizationName.trim(),
         description: form.description.trim(),
         type: form.type,
-        logoUrl: form.logoUrl.trim() || null,
+        logoUrl: null,
         phone: form.phone.trim(),
         email: form.email.trim(),
+        createdByUserId,
       })
       const created = normalizeOrganization(response.data)
       setData((current) => [created, ...current])
@@ -107,6 +115,8 @@ function OrganizationsPage() {
       setIsCreateOpen(false)
       setSuccessMessage(response.data?.message || 'Đã tạo tổ chức')
     } catch (err) {
+      const fieldErrors = getFieldErrors(err)
+      setErrors((current) => ({ ...current, ...fieldErrors }))
       setError(getErrorMessage(err))
     } finally {
       setIsSubmitting(false)
@@ -119,7 +129,7 @@ function OrganizationsPage() {
         <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
           <div
             className="relative min-h-[260px] bg-cover bg-center"
-            style={{ backgroundImage: `url(${organizationHeroImage})` }}
+            style={{ backgroundImage: `url(${organizationHeroImage})` }} /* Dynamic background image */
           >
             <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/85 via-neutral-950/55 to-neutral-950/10" />
             <div className="relative flex min-h-[260px] flex-col justify-between gap-8 p-6 text-white md:p-8">

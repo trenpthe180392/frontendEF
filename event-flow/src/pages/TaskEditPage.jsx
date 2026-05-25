@@ -3,6 +3,7 @@ import { ArrowLeft, ClipboardList, Save } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { taskApi, teamApi, teamMemberApi } from '../api'
+import { normalizePageResponse } from '../api/response'
 import FormField from '../components/form/FormField'
 import Card from '../components/layout/Card'
 import Button from '../components/ui/Button'
@@ -50,7 +51,7 @@ function TaskEditContent({ eventDetail, eventId, teamId, taskId, backPath, onErr
 
     try {
       const response = await teamMemberApi.getByTeam(Number(teamValue))
-      const normalizedMembers = (response.data || []).map(normalizeTeamMember)
+      const normalizedMembers = normalizePageResponse(response.data, 100).items.map(normalizeTeamMember)
       setTeamMembers(normalizedMembers)
       return normalizedMembers
     } catch (err) {
@@ -71,7 +72,7 @@ function TaskEditContent({ eventDetail, eventId, teamId, taskId, backPath, onErr
 
       if (!teamId) {
         const teamsResponse = await teamApi.getByEvent(eventId)
-        const eventTeams = teamsResponse.data || []
+        const eventTeams = normalizePageResponse(teamsResponse.data, 100).items
         setTeams(eventTeams)
         if (!nextForm.teamId) {
           nextForm.teamId = resolveTeamId(task, eventTeams)

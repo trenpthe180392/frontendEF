@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, FileText, MessageSquareText, Paperclip, Star, Trash2, Upload } from 'lucide-react'
+import { ArrowLeft, ClipboardList, FileText, MessageSquareText, Paperclip, Plus, Star, Trash2, Upload } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { attachmentApi, taskApi } from '../api'
+import { unwrapData } from '../api/response'
 import Card from '../components/layout/Card'
+import EmptyState from '../components/layout/EmptyState'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
@@ -24,21 +26,39 @@ function formatFileSize(value) {
 function TaskDetailContent({ taskId, backPath, onError, onSuccess }) {
   const navigate = useNavigate()
   const [task, setTask] = useState(null)
+  const [subtasks, setSubtasks] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isSubtasksLoading, setIsSubtasksLoading] = useState(false)
+  const [subtasksError, setSubtasksError] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
   const [deletingAttachmentId, setDeletingAttachmentId] = useState(null)
 
   async function loadTask() {
     setIsLoading(true)
+    setIsSubtasksLoading(true)
+    setSubtasksError(null)
     onError(null)
 
     try {
-      const response = await taskApi.getById(taskId)
-      setTask(response.data)
+      const [taskResult, subtasksResult] = await Promise.allSettled([
+        taskApi.getById(taskId),
+        taskApi.getSubtasks(taskId),
+      ])
+
+      if (taskResult.status === 'rejected') throw taskResult.reason
+      setTask(unwrapData(taskResult.value.data))
+
+      if (subtasksResult.status === 'fulfilled') {
+        setSubtasks(normalizeSubtasks(unwrapData(subtasksResult.value.data)))
+      } else {
+        setSubtasks([])
+        setSubtasksError(getErrorMessage(subtasksResult.reason))
+      }
     } catch (err) {
       onError(getErrorMessage(err))
     } finally {
       setIsLoading(false)
+      setIsSubtasksLoading(false)
     }
   }
 
@@ -96,6 +116,9 @@ function TaskDetailContent({ taskId, backPath, onError, onSuccess }) {
             <h1 className="mt-1 text-2xl font-bold text-neutral-900">{task?.title || 'Đang tải công việc...'}</h1>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="primary" leftIcon={<Plus size={16} />} onClick={() => navigate(`${backPath}/create?parentTaskId=${taskId}`)}>
+              Tạo công việc con
+            </Button>
             <Button type="button" variant="secondary" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
               Quay lại danh sách
             </Button>
@@ -125,6 +148,14 @@ function TaskDetailContent({ taskId, backPath, onError, onSuccess }) {
               <Info label="Hạn hoàn thành" value={formatDateTime(deadline)} />
             </div>
           </Card>
+
+          <TaskSubtasksSection
+            subtasks={subtasks}
+            isLoading={isSubtasksLoading}
+            error={subtasksError}
+            backPath={backPath}
+            onReload={loadTask}
+          />
 
           <Card title="Feedback">
             {(task.feedback || []).length === 0 ? (
@@ -214,6 +245,75 @@ function TaskDetailContent({ taskId, backPath, onError, onSuccess }) {
   )
 }
 
+function TaskSubtasksSection({ subtasks, isLoading, error, backPath, onReload }) {
+  const navigate = useNavigate()
+
+  return (
+    <Card
+      title="Công việc con"
+      headerRight={
+        <Button type="button" variant="secondary" size="sm" onClick={onReload}>
+          Tải lại
+        </Button>
+      }
+    >
+      {isLoading ? (
+        <div className="flex min-h-[180px] flex-col items-center justify-center gap-3">
+          <Spinner size="md" />
+          <p className="text-sm text-neutral-500">Đang tải công việc con...</p>
+        </div>
+      ) : error ? (
+        <div className="rounded-lg border border-danger/20 bg-danger-bg p-4">
+          <p className="text-sm font-semibold text-danger">Không tải được công việc con</p>
+          <p className="mt-1 text-sm text-danger">{error}</p>
+        </div>
+      ) : subtasks.length === 0 ? (
+        <EmptyState
+          icon={<ClipboardList size={24} />}
+          title="Chưa có công việc con"
+          description="Nếu backend trả về child task, danh sách sẽ hiển thị tại đây."
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-neutral-300">
+          <table className="min-w-full divide-y divide-neutral-100 text-sm">
+            <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase text-neutral-500">
+              <tr>
+                <th className="px-4 py-3">Công việc</th>
+                <th className="px-4 py-3">Ưu tiên</th>
+                <th className="px-4 py-3">Hạn</th>
+                <th className="px-4 py-3">Tiến độ</th>
+                <th className="px-4 py-3">Trạng thái</th>
+                <th className="px-4 py-3 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100 bg-white">
+              {subtasks.map((subtask) => (
+                <tr key={subtask.id} className="hover:bg-neutral-50">
+                  <td className="px-4 py-3">
+                    <p className="font-semibold text-neutral-900">{subtask.title || 'Công việc con'}</p>
+                    <p className="text-xs text-neutral-500">{subtask.assigneeName || subtask.assignedTo || 'Chưa gán'}</p>
+                  </td>
+                  <td className="px-4 py-3 text-neutral-700">{subtask.priority || 'MEDIUM'}</td>
+                  <td className="px-4 py-3 text-neutral-700">{formatDateTime(subtask.dueTime || subtask.deadline || subtask.dueDate)}</td>
+                  <td className="px-4 py-3 text-neutral-700">{subtask.progress ?? 0}%</td>
+                  <td className="px-4 py-3">
+                    <Badge variant={statusVariant[String(subtask.status || '').toLowerCase()] || 'default'}>{subtask.status || 'TODO'}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button type="button" variant="secondary" size="sm" onClick={() => navigate(`${backPath}/${subtask.id}`)}>
+                      Xem
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function Info({ label, value }) {
   return (
     <div className="rounded-lg bg-neutral-50 px-3 py-2">
@@ -221,6 +321,13 @@ function Info({ label, value }) {
       <p className="mt-1 font-semibold text-neutral-900">{value}</p>
     </div>
   )
+}
+
+function normalizeSubtasks(data) {
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.content)) return data.content
+  if (Array.isArray(data?.items)) return data.items
+  return []
 }
 
 function TaskDetailPage() {

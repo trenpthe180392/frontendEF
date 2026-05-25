@@ -3,6 +3,7 @@ import { ClipboardList, Eye, Pencil, Plus, Sparkles, Trash2, TriangleAlert, X } 
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { aiApi, taskApi, teamApi, teamMemberApi } from '../api'
+import { normalizePageResponse } from '../api/response'
 import ConfirmDialog from '../components/feedback/ConfirmDialog'
 import FormField from '../components/form/FormField'
 import Card from '../components/layout/Card'
@@ -32,6 +33,11 @@ const emptyTaskForm = {
 }
 
 const DEFAULT_TASKS_PER_PAGE = 10
+const financeRoleLabels = {
+  BUDGET_MAJOR_TASK: { label: 'Task cha ngân sách', variant: 'success' },
+  BUDGET_SUBTASK: { label: 'Task con chi phí', variant: 'info' },
+  OPERATIONAL_TASK: { label: 'Công việc vận hành', variant: 'default' },
+}
 
 function normalizeTaskPage(responseData, pageSize = DEFAULT_TASKS_PER_PAGE) {
   if (Array.isArray(responseData)) {
@@ -42,11 +48,12 @@ function normalizeTaskPage(responseData, pageSize = DEFAULT_TASKS_PER_PAGE) {
       number: 0,
     }
   }
+  const page = responseData?.page || {}
   return {
     content: responseData?.content || [],
-    totalElements: responseData?.totalElements || 0,
-    totalPages: Math.max(1, responseData?.totalPages || 1),
-    number: responseData?.number || 0,
+    totalElements: responseData?.totalElements ?? page.totalElements ?? 0,
+    totalPages: Math.max(1, responseData?.totalPages ?? page.totalPages ?? 1),
+    number: responseData?.number ?? page.number ?? 0,
   }
 }
 
@@ -83,7 +90,7 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
       setTotalElements(taskPage.totalElements)
       setTotalPages(taskPage.totalPages)
       setCurrentPage(taskPage.number + 1)
-      setTeams(teamsResponse.data || [])
+      setTeams(normalizePageResponse(teamsResponse.data, 100).items)
     } catch (err) {
       onError(getErrorMessage(err))
     }
@@ -97,7 +104,7 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
 
     try {
       const response = await teamMemberApi.getByTeam(Number(teamId))
-      setTeamMembers((response.data || []).map(normalizeTeamMember))
+      setTeamMembers(normalizePageResponse(response.data, 100).items.map(normalizeTeamMember))
     } catch (err) {
       setTeamMembers([])
       onError(getErrorMessage(err))
@@ -165,6 +172,7 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
     return {
       title: formValue.title.trim(),
       description: formValue.description,
+      taskType: formValue.taskType || null,
       priority: formValue.priority,
       status: formValue.status,
       dueTime: toApiDateTime(formValue.dueTime),
@@ -237,6 +245,7 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
           id: `ai-${Date.now()}-${index}`,
           title,
           description: task.description || '',
+          taskType: task.taskType || null,
           priority: normalizeSuggestionPriority(task.priority),
           status: normalizeSuggestionStatus(task.status),
           dueTime: toDateTimeLocalValue(task.dueTime),
@@ -357,6 +366,11 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
           { label: 'Bộ lọc', value: statusFilter },
         ]}
       />
+      <Card title="Phạm vi công việc và tài chính">
+        <p className="text-sm leading-6 text-neutral-600">
+          Gợi ý AI trong trang Công việc tạo <strong>công việc vận hành</strong>. Task tham gia ngân sách chỉ được tạo từ trang Tài chính: task cha nhận phân bổ, task con lập yêu cầu chi phí.
+        </p>
+      </Card>
       <Card
         title="Danh sách công việc"
       >
@@ -474,7 +488,10 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
                     <div key={draft.id} className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-neutral-900">{index + 1}. {draft.title}</p>
-                        {draft.source === 'AI' ? <Badge variant="info">AI</Badge> : null}
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {draft.source === 'AI' ? <Badge variant="info">AI</Badge> : null}
+                          <Badge variant="default">Công việc vận hành</Badge>
+                        </div>
                         <p className="mt-1 text-xs text-neutral-500">
                           {draft.priority} - {draft.status} - {formatDateTime(draft.dueTime)} - {draft.teamName} - {draft.assigneeName}
                         </p>
@@ -543,6 +560,9 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
                   <tr key={task.id} className="hover:bg-neutral-50">
                     <td className="px-4 py-3">
                       <p className="font-semibold text-neutral-900">{task.title}</p>
+                      <Badge variant={financeRoleLabels[task.financeRole]?.variant || 'default'}>
+                        {financeRoleLabels[task.financeRole]?.label || 'Công việc vận hành'}
+                      </Badge>
                       <p className="text-xs text-neutral-500">{task.assigneeName || 'Chưa gán'}</p>
                     </td>
                     <td className="px-4 py-3 text-neutral-700">{task.priority || 'MEDIUM'}</td>
@@ -631,28 +651,26 @@ function EventTasksPage() {
 
 function canCreateTaskForEvent(eventDetail) {
   if (!eventDetail) return false
-  if (eventDetail.status !== 'ongoing') return false
+  if (!['draft', 'published', 'ongoing'].includes(String(eventDetail.status || '').toLowerCase())) return false
 
   const now = new Date()
-  const start = eventDetail.startTime ? new Date(eventDetail.startTime) : null
   const end = eventDetail.endTime ? new Date(eventDetail.endTime) : null
 
-  if (start && now < start) return false
   if (end && now > end) return false
   return true
 }
 
 function getTaskCreationBlockedMessage(eventDetail) {
   if (!eventDetail) return 'Không xác định được thông tin sự kiện.'
-  if (eventDetail.status !== 'ongoing') return 'Công việc chỉ được tạo khi sự kiện ở trạng thái Đang diễn ra.'
+  if (!['draft', 'published', 'ongoing'].includes(String(eventDetail.status || '').toLowerCase())) {
+    return 'Không thể tạo công việc khi sự kiện đã hoàn tất, đã hủy hoặc đã xóa.'
+  }
 
   const now = new Date()
-  const start = eventDetail.startTime ? new Date(eventDetail.startTime) : null
   const end = eventDetail.endTime ? new Date(eventDetail.endTime) : null
 
-  if (start && now < start) return 'Chưa đến thời gian bắt đầu sự kiện.'
   if (end && now > end) return 'Sự kiện đã kết thúc.'
-  return 'Công việc chỉ được tạo trong khoảng thời gian diễn ra sự kiện.'
+  return 'Không thể tạo công việc cho sự kiện này.'
 }
 
 function validateTaskDueTime(eventDetail, dueTimeValue) {
@@ -662,10 +680,8 @@ function validateTaskDueTime(eventDetail, dueTimeValue) {
   const now = new Date()
   if (dueTime < now) return 'Hạn hoàn thành không được trước thời điểm hiện tại'
 
-  const start = eventDetail?.startTime ? new Date(eventDetail.startTime) : null
   const end = eventDetail?.endTime ? new Date(eventDetail.endTime) : null
 
-  if (start && dueTime < start) return 'Hạn hoàn thành không được trước thời gian bắt đầu sự kiện'
   if (end && dueTime > end) return 'Hạn hoàn thành không được sau thời gian kết thúc sự kiện'
   return null
 }

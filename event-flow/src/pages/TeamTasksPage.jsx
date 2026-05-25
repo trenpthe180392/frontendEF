@@ -3,6 +3,7 @@ import { ClipboardList, Eye, Pencil, Plus, Sparkles, TriangleAlert, X } from 'lu
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { aiApi, taskApi, teamApi, teamMemberApi } from '../api'
+import { getApiMessage, normalizePageResponse } from '../api/response'
 import FormField from '../components/form/FormField'
 import Card from '../components/layout/Card'
 import EmptyState from '../components/layout/EmptyState'
@@ -21,6 +22,11 @@ import { formatDateTime } from '../utils/dateFormat'
 
 const emptyForm = { title: '', description: '', priority: 'MEDIUM', status: 'TODO', dueTime: '', assigneeId: '', progress: '0' }
 const DEFAULT_TASKS_PER_PAGE = 10
+const financeRoleLabels = {
+  BUDGET_MAJOR_TASK: { label: 'Task cha ngân sách', variant: 'success' },
+  BUDGET_SUBTASK: { label: 'Task con chi phí', variant: 'info' },
+  OPERATIONAL_TASK: { label: 'Công việc vận hành', variant: 'default' },
+}
 
 function normalizeTaskPage(responseData, pageSize = DEFAULT_TASKS_PER_PAGE) {
   if (Array.isArray(responseData)) {
@@ -31,11 +37,12 @@ function normalizeTaskPage(responseData, pageSize = DEFAULT_TASKS_PER_PAGE) {
       number: 0,
     }
   }
+  const page = responseData?.page || {}
   return {
     content: responseData?.content || [],
-    totalElements: responseData?.totalElements || 0,
-    totalPages: Math.max(1, responseData?.totalPages || 1),
-    number: responseData?.number || 0,
+    totalElements: responseData?.totalElements ?? page.totalElements ?? 0,
+    totalPages: Math.max(1, responseData?.totalPages ?? page.totalPages ?? 1),
+    number: responseData?.number ?? page.number ?? 0,
   }
 }
 
@@ -71,7 +78,7 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
       setTotalElements(taskPage.totalElements)
       setTotalPages(taskPage.totalPages)
       setCurrentPage(taskPage.number + 1)
-      setMembers((membersResponse.data || []).map(normalizeTeamMember))
+      setMembers(normalizePageResponse(membersResponse.data, 100).items.map(normalizeTeamMember))
       setTeam(teamResponse.data || null)
     } catch (err) {
       onError(getErrorMessage(err))
@@ -134,6 +141,7 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
     return {
       title: formValue.title.trim(),
       description: formValue.description,
+      taskType: formValue.taskType || null,
       priority: formValue.priority,
       status: formValue.status,
       dueTime: toApiDateTime(formValue.dueTime),
@@ -198,6 +206,7 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
         id: `ai-${Date.now()}-${index}`,
         title: task.title?.trim() || `Công việc AI ${index + 1}`,
         description: task.description || '',
+        taskType: task.taskType || null,
         priority: normalizeSuggestionPriority(task.priority),
         status: normalizeSuggestionStatus(task.status),
         dueTime: toDateTimeLocalValue(task.dueTime),
@@ -249,13 +258,16 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
     onSuccess(null)
 
     try {
+      let response;
       if (userId) {
-        await taskApi.reassignUser(task.id, Number(userId))
-        onSuccess('Đã gán công việc cho thành viên')
+        response = await taskApi.reassignUser(task.id, Number(userId))
       } else {
-        await taskApi.unassign(task.id)
-        onSuccess('Đã bỏ gán thành viên')
+        response = await taskApi.unassign(task.id)
       }
+
+      const message = getApiMessage(response, userId ? 'Đã gán công việc cho thành viên' : 'Đã bỏ gán thành viên');
+      onSuccess(message);
+
       await loadTasks()
     } catch (err) {
       onError(getErrorMessage(err))
@@ -300,6 +312,9 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
           </Button>
         }
       >
+        <div className="mb-4 rounded-lg border border-info/20 bg-info-bg p-3 text-sm leading-6 text-info">
+          Gợi ý AI tại đây tạo công việc vận hành của đội. Task con dùng để lập chi phí chỉ được tạo từ task cha ngân sách trong trang Tài chính.
+        </div>
         {!canCreateTask ? (
           <div className="mb-4 flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-bg p-4 text-sm text-warning">
             <TriangleAlert size={18} className="mt-0.5 shrink-0" />
@@ -381,7 +396,10 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
                     <div key={draft.id} className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-neutral-900">{index + 1}. {draft.title}</p>
-                        {draft.source === 'AI' ? <Badge variant="info">AI</Badge> : null}
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {draft.source === 'AI' ? <Badge variant="info">AI</Badge> : null}
+                          <Badge variant="default">Công việc vận hành</Badge>
+                        </div>
                         <p className="mt-1 text-xs text-neutral-500">
                           {draft.priority} - {draft.status} - {formatDateTime(draft.dueTime)} - {draft.assigneeName}
                         </p>
@@ -450,6 +468,9 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
                   <tr key={task.id}>
                     <td className="px-4 py-3">
                       <p className="font-semibold text-neutral-900">{task.title}</p>
+                      <Badge variant={financeRoleLabels[task.financeRole]?.variant || 'default'}>
+                        {financeRoleLabels[task.financeRole]?.label || 'Công việc vận hành'}
+                      </Badge>
                       <p className="text-xs text-neutral-500">{task.assigneeName || 'Chưa gán'}</p>
                     </td>
                     <td className="px-4 py-3 text-neutral-700">{task.priority || 'MEDIUM'}</td>
@@ -523,28 +544,26 @@ function TeamTasksPage() {
 
 function canCreateTaskForEvent(eventDetail) {
   if (!eventDetail) return false
-  if (eventDetail.status !== 'ongoing') return false
+  if (!['draft', 'published', 'ongoing'].includes(String(eventDetail.status || '').toLowerCase())) return false
 
   const now = new Date()
-  const start = eventDetail.startTime ? new Date(eventDetail.startTime) : null
   const end = eventDetail.endTime ? new Date(eventDetail.endTime) : null
 
-  if (start && now < start) return false
   if (end && now > end) return false
   return true
 }
 
 function getTaskCreationBlockedMessage(eventDetail) {
   if (!eventDetail) return 'Không xác định được thông tin sự kiện.'
-  if (eventDetail.status !== 'ongoing') return 'Công việc chỉ được tạo khi sự kiện ở trạng thái Đang diễn ra.'
+  if (!['draft', 'published', 'ongoing'].includes(String(eventDetail.status || '').toLowerCase())) {
+    return 'Không thể tạo công việc khi sự kiện đã hoàn tất, đã hủy hoặc đã xóa.'
+  }
 
   const now = new Date()
-  const start = eventDetail.startTime ? new Date(eventDetail.startTime) : null
   const end = eventDetail.endTime ? new Date(eventDetail.endTime) : null
 
-  if (start && now < start) return 'Chưa đến thời gian bắt đầu sự kiện.'
   if (end && now > end) return 'Sự kiện đã kết thúc.'
-  return 'Công việc chỉ được tạo trong khoảng thời gian diễn ra sự kiện.'
+  return 'Không thể tạo công việc cho sự kiện này.'
 }
 
 function validateTaskDueTime(eventDetail, dueTimeValue) {
@@ -554,10 +573,8 @@ function validateTaskDueTime(eventDetail, dueTimeValue) {
   const now = new Date()
   if (dueTime < now) return 'Hạn hoàn thành không được trước thời điểm hiện tại'
 
-  const start = eventDetail?.startTime ? new Date(eventDetail.startTime) : null
   const end = eventDetail?.endTime ? new Date(eventDetail.endTime) : null
 
-  if (start && dueTime < start) return 'Hạn hoàn thành không được trước thời gian bắt đầu sự kiện'
   if (end && dueTime > end) return 'Hạn hoàn thành không được sau thời gian kết thúc sự kiện'
   return null
 }

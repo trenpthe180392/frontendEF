@@ -4,6 +4,7 @@ export const taskApi = {
   getById: (taskId) => apiClient.get(`/tasks/${taskId}`),
   getByEvent: (eventId, params) => apiClient.get(`/tasks/event/${eventId}`, { params }),
   getByTeam: (teamId, params) => apiClient.get(`/tasks/team/${teamId}`, { params }),
+  getSubtasks: (taskId) => apiClient.get(`/tasks/${taskId}/subtasks`),
   create: (data) => apiClient.post('/tasks', data),
   update: (taskId, data) => apiClient.put(`/tasks/${taskId}`, data),
   assignUser: (taskId, userId) => apiClient.patch(`/tasks/${taskId}/assignee`, { userId }),

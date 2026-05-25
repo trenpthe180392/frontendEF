@@ -4,11 +4,19 @@ import EventCaseLayout, { EventInfoPanel } from '../features/events/EventCaseLay
 
 function EventInfoPage() {
   const [error, setError] = useState(null)
-  const [successMessage] = useState(null)
+  const [successMessage, setSuccessMessage] = useState(null)
 
   return (
     <EventCaseLayout error={error} successMessage={successMessage} onError={setError}>
-      {({ eventDetail, organizationId }) => <EventInfoPanel eventDetail={eventDetail} organizationId={organizationId} />}
+      {({ eventDetail, organizationId, reloadEvent }) => (
+        <EventInfoPanel
+          eventDetail={eventDetail}
+          organizationId={organizationId}
+          onError={setError}
+          onSuccess={setSuccessMessage}
+          onReload={reloadEvent}
+        />
+      )}
     </EventCaseLayout>
   )
 }

@@ -3,6 +3,7 @@ import { BadgeCheck, Eye, ShieldCheck, Trash2, UserCheck, UserPlus, Users, X } f
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { eventMemberApi, organizationMemberApi } from '../api'
+import { normalizePageResponse } from '../api/response'
 import ConfirmDialog from '../components/feedback/ConfirmDialog'
 import FormField from '../components/form/FormField'
 import Card from '../components/layout/Card'
@@ -13,27 +14,26 @@ import PaginationControls from '../components/ui/PaginationControls'
 import Select from '../components/ui/Select'
 import Spinner from '../components/ui/Spinner'
 import EventCaseLayout, { EventWorkspaceHeader } from '../features/events/EventCaseLayout'
-import { eventRoleLabels, eventRoleOptions, normalizeEventMember } from '../features/events/eventPageUtils'
+import { eventCapabilityLabels, eventCapabilityOptions, eventRoleLabels, eventRoleOptions, normalizeEventMember } from '../features/events/eventPageUtils'
 import { statusVariant } from '../features/organizations/organizationConstants'
 import { getErrorMessage } from '../utils'
 import { normalizeOrganizationMember } from '../utils/organizationMappers'
 
-const emptyMemberForm = { userId: '', role: 'MEMBER' }
+const emptyMemberForm = { userId: '', role: 'MEMBER', capabilities: [] }
 const DEFAULT_MEMBERS_PER_PAGE = 10
 const privilegedRoles = new Set(['OWNER', 'LEADER'])
 const roleDescriptions = {
   OWNER: 'Người chịu trách nhiệm cao nhất của sự kiện, quản lý cấu hình, thành viên và quyết định vận hành chính.',
   LEADER: 'Điều phối tổng thể kế hoạch, tiến độ và phối hợp giữa các đội nhóm trong sự kiện.',
-  TEAM_LEADER: 'Đầu mối phụ trách một đội nhóm hoặc hạng mục, theo dõi nhân sự và bàn giao công việc của đội nhóm.',
   MEMBER: 'Thành viên ban tổ chức nội bộ, tham gia xử lý công việc và cập nhật tiến độ theo phân công.',
   HOST: 'Vai trò cũ, được hiển thị tương đương chủ sự kiện.',
   ORGANIZER: 'Vai trò cũ, được hiển thị tương đương trưởng sự kiện.',
-  STAFF: 'Vai trò cũ, được hiển thị tương đương thành viên.',
-  CHECKER: 'Vai trò cũ, được hiển thị tương đương thành viên.',
+  STAFF: 'Nhân sự hỗ trợ vận hành sự kiện.',
+  CHECKER: 'Nhân sự phụ trách check-in và xác nhận người tham dự.',
   ATTENDEE: 'Vai trò cũ, được hiển thị tương đương thành viên.',
   ORG_ADMIN: 'Vai trò cũ, được hiển thị tương đương chủ sự kiện.',
-  FINANCE_MANAGER: 'Vai trò cũ, được hiển thị tương đương trưởng tài chính.',
-  FINANCE_EXECUTOR: 'Vai trò cũ, được hiển thị tương đương trưởng đội tài chính.',
+  FINANCE_MANAGER: 'Quản lý ngân sách và nghiệp vụ tài chính cấp sự kiện.',
+  FINANCE_EXECUTOR: 'Thực hiện nghiệp vụ tài chính được phân công trong sự kiện.',
 }
 
 function normalizeMemberPage(responseData, pageSize = DEFAULT_MEMBERS_PER_PAGE) {
@@ -45,11 +45,12 @@ function normalizeMemberPage(responseData, pageSize = DEFAULT_MEMBERS_PER_PAGE) 
       number: 0,
     }
   }
+  const page = responseData?.page || {}
   return {
     content: responseData?.content || [],
-    totalElements: responseData?.totalElements || 0,
-    totalPages: Math.max(1, responseData?.totalPages || 1),
-    number: responseData?.number || 0,
+    totalElements: responseData?.totalElements ?? page.totalElements ?? 0,
+    totalPages: Math.max(1, responseData?.totalPages ?? page.totalPages ?? 1),
+    number: responseData?.number ?? page.number ?? 0,
   }
 }
 
@@ -67,6 +68,7 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [pendingRemoveMember, setPendingRemoveMember] = useState(null)
+  const [offboardingImpact, setOffboardingImpact] = useState(null)
   const [removingUserId, setRemovingUserId] = useState(null)
 
   async function loadMembers() {
@@ -84,7 +86,11 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
       setTotalElements(memberPage.totalElements)
       setTotalPages(memberPage.totalPages)
       setCurrentPage(memberPage.number + 1)
-      setOrganizationMembers((organizationMembersResponse.data || []).map(normalizeOrganizationMember))
+      setOrganizationMembers(
+        normalizePageResponse(organizationMembersResponse.data, 100).items
+          .map(normalizeOrganizationMember)
+          .filter((member) => member.status === 'active')
+      )
     } catch (err) {
       onError(getErrorMessage(err))
     } finally {
@@ -113,6 +119,16 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
     setMemberErrors((current) => ({ ...current, [name]: null }))
   }
 
+  function toggleCapability(capability) {
+    setMemberForm((current) => ({
+      ...current,
+      capabilities: current.capabilities.includes(capability)
+        ? current.capabilities.filter((item) => item !== capability)
+        : [...current.capabilities, capability],
+    }))
+    setMemberErrors((current) => ({ ...current, capabilities: null }))
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
     const nextErrors = {}
@@ -124,6 +140,9 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
     if (availableMembers.length === 0) nextErrors.userId = 'Không còn thành viên tổ chức khả dụng để thêm'
     if (!memberForm.role) nextErrors.role = 'Vui lòng chọn vai trò'
     if (!eventRoleOptions.includes(memberForm.role)) nextErrors.role = 'Vai trò không hợp lệ'
+    if (memberForm.capabilities.includes('FINANCE_MANAGER') && memberForm.capabilities.includes('FINANCE_EXECUTOR')) {
+      nextErrors.capabilities = 'Không gán cùng lúc quản lý tài chính và thực hiện giải ngân cho một người.'
+    }
     setMemberErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
@@ -136,6 +155,7 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
         eventId,
         userId: Number(memberForm.userId),
         role: memberForm.role,
+        capabilities: memberForm.capabilities,
       })
       setMemberForm(emptyMemberForm)
       setIsFormOpen(false)
@@ -186,6 +206,24 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
     }
   }
 
+  async function inspectOffboarding(member) {
+    onError(null)
+    try {
+      const response = await eventMemberApi.getOffboardingImpact(eventId, member.userId)
+      const impact = response.data
+      setOffboardingImpact(impact)
+      if (!impact.canRemove) {
+        const tasks = impact.assignedTaskTitles?.length ? `Task cần chuyển giao: ${impact.assignedTaskTitles.join(', ')}. ` : ''
+        const teams = impact.teamNames?.length ? `Đội nhóm cần gỡ: ${impact.teamNames.join(', ')}.` : ''
+        onError(`${impact.guidance} ${tasks}${teams}`)
+        return
+      }
+      setPendingRemoveMember(member)
+    } catch (err) {
+      onError(getErrorMessage(err))
+    }
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -226,7 +264,7 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
         <form className="mb-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4" onSubmit={handleSubmit}>
           <div className="mb-4 flex items-start gap-3 rounded-xl border border-info/20 bg-info-bg p-3 text-sm text-info">
             <ShieldCheck size={18} className="mt-0.5 shrink-0" />
-            <p>Chỉ có thể thêm người đã là thành viên của tổ chức. Mỗi người dùng chỉ xuất hiện một lần trong sự kiện.</p>
+            <p>Vai trò sự kiện quản lý phạm vi chung; vai trò đội nhóm quản lý một đội. Thành viên sự kiện vẫn có thể là trưởng đội nếu được phân công.</p>
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
             <FormField label="Thành viên tổ chức" required error={memberErrors.userId}>
@@ -258,11 +296,30 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
                 <p className="mt-1 text-xs leading-5 text-neutral-500">{roleDescriptions[memberForm.role] || 'Vai trò nội bộ trong sự kiện.'}</p>
                 {privilegedRoles.has(memberForm.role) ? (
                   <p className="mt-2 text-xs font-semibold text-warning">
-                    Vai trò quyền cao, chỉ gán cho người chịu trách nhiệm rõ ràng.
+                    {memberForm.role === 'OWNER'
+                      ? 'Chỉ Chủ sự kiện hiện hữu được gán thêm đồng chủ. Ưu tiên Trưởng sự kiện nếu người này chỉ điều phối vận hành.'
+                      : 'Vai trò quyền cao, chỉ gán cho người chịu trách nhiệm rõ ràng.'}
                   </p>
                 ) : null}
               </div>
             </div>
+          </div>
+          <div className="mt-3 rounded-lg border border-neutral-200 bg-white p-3">
+            <p className="text-sm font-semibold text-neutral-900">Quyền chuyên môn</p>
+            <p className="mt-1 text-xs text-neutral-500">Gán theo nhiệm vụ thực tế, kể cả cho MEMBER. Quản lý tài chính và thực hiện giải ngân phải là hai người khác nhau.</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {eventCapabilityOptions.map((capability) => (
+                <label key={capability} className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={memberForm.capabilities.includes(capability)}
+                    onChange={() => toggleCapability(capability)}
+                  />
+                  {eventCapabilityLabels[capability]}
+                </label>
+              ))}
+            </div>
+            {memberErrors.capabilities ? <p className="mt-2 text-sm text-danger">{memberErrors.capabilities}</p> : null}
           </div>
           <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="secondary" onClick={closeForm} disabled={isSubmitting}>
@@ -300,6 +357,9 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
                 </div>
                   <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={privilegedRoles.has(member.role) ? 'warning' : 'info'}>{eventRoleLabels[member.role] || member.role}</Badge>
+                  {member.capabilities.map((capability) => (
+                    <Badge key={capability} variant="warning">{eventCapabilityLabels[capability] || capability}</Badge>
+                  ))}
                   <Badge variant={statusVariant[member.status] || 'default'}>{member.status}</Badge>
                   <Button
                     variant="secondary"
@@ -314,7 +374,7 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
                     size="sm"
                     leftIcon={<Trash2 size={16} />}
                     loading={removingUserId === member.userId}
-                    onClick={() => setPendingRemoveMember(member)}
+                    onClick={() => inspectOffboarding(member)}
                   >
                     Xóa
                   </Button>
@@ -339,9 +399,9 @@ function EventMembersContent({ organizationId, eventId, onError, onSuccess }) {
       <ConfirmDialog
         open={Boolean(pendingRemoveMember)}
         title="Xóa thành viên khỏi sự kiện"
-        description={`Xóa ${pendingRemoveMember?.userName || 'thành viên'} khỏi ban tổ chức của sự kiện này?`}
+        description={`Gỡ ${pendingRemoveMember?.userName || 'thành viên'} khỏi sự kiện? Các quyền chuyên môn (${offboardingImpact?.capabilities?.join(', ') || 'không có'}) cũng sẽ được thu hồi.`}
         loading={Boolean(removingUserId)}
-        onClose={() => setPendingRemoveMember(null)}
+        onClose={() => { setPendingRemoveMember(null); setOffboardingImpact(null) }}
         onConfirm={handleConfirmRemoveMember}
       />
     </div>

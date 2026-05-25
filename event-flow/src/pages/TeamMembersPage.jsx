@@ -3,6 +3,7 @@ import { BadgeCheck, Eye, Pencil, ShieldCheck, Trash2, UserCheck, UserPlus, User
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { eventMemberApi, teamMemberApi } from '../api'
+import { normalizePageResponse } from '../api/response'
 import ConfirmDialog from '../components/feedback/ConfirmDialog'
 import FormField from '../components/form/FormField'
 import Card from '../components/layout/Card'
@@ -79,7 +80,7 @@ function TeamMembersContent({ eventId, teamId, onError, onSuccess }) {
       setTotalElements(memberPage.totalElements)
       setTotalPages(memberPage.totalPages)
       setCurrentPage(memberPage.number + 1)
-      setEventMembers((eventMembersResponse.data || []).map(normalizeEventMember))
+      setEventMembers(normalizePageResponse(eventMembersResponse.data, 100).items.map(normalizeEventMember))
     } catch (err) {
       onError(getErrorMessage(err))
     }
