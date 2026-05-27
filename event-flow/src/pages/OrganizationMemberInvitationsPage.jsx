@@ -11,9 +11,13 @@ import Select from '../components/ui/Select'
 import OrganizationCaseLayout from '../features/organizations/OrganizationCaseLayout'
 import { statusVariant } from '../features/organizations/organizationConstants'
 import {
+  getOrganizationInvitationRowPolicy,
+  getOrganizationInvitePolicy,
+  getOrganizationPermissions,
+} from '../features/organizations/organizationPermissions'
+import {
   organizationRoleDescriptions,
   organizationRoleLabels,
-  organizationRoleOptions,
   privilegedOrganizationRoles,
 } from '../features/organizations/organizationRoles'
 import useAutoReload from '../hooks/useAutoReload'
@@ -21,7 +25,12 @@ import { getErrorMessage } from '../utils'
 import { formatDateTime } from '../utils/dateFormat'
 import { normalizeOrganizationInvitation } from '../utils/organizationMappers'
 
-function OrganizationMemberInvitationsContent({ organizationId, onError, onSuccess }) {
+function OrganizationMemberInvitationsContent({
+  organizationId,
+  onError,
+  onSuccess,
+  permissions = getOrganizationPermissions('MEMBER'),
+}) {
   const navigate = useNavigate()
   const [invitations, setInvitations] = useState([])
   const [isLoading, setIsLoading] = useState(false)
@@ -30,8 +39,14 @@ function OrganizationMemberInvitationsContent({ organizationId, onError, onSucce
   const [updatingInvitationId, setUpdatingInvitationId] = useState(null)
   const [cancelingInvitationId, setCancelingInvitationId] = useState(null)
   const pendingInvitations = invitations.filter((invitation) => invitation.status === 'pending')
+  const invitePolicy = getOrganizationInvitePolicy(permissions)
 
   async function loadInvitations() {
+    if (!invitePolicy.canViewInvitations) {
+      setInvitations([])
+      return
+    }
+
     setIsLoading(true)
     onError(null)
 
@@ -53,8 +68,9 @@ function OrganizationMemberInvitationsContent({ organizationId, onError, onSucce
   useAutoReload(loadInvitations)
 
   function handleEditInvitation(invitation) {
+    const rowPolicy = getOrganizationInvitationRowPolicy(permissions, invitation)
     setEditingInvitationId(invitation.invitationId)
-    setInvitationDraftRole(organizationRoleOptions.includes(invitation.role) ? invitation.role : 'MEMBER')
+    setInvitationDraftRole(rowPolicy.editableRoles.includes(invitation.role) ? invitation.role : rowPolicy.editableRoles[0] || 'MEMBER')
     onError(null)
     onSuccess(null)
   }
@@ -99,6 +115,8 @@ function OrganizationMemberInvitationsContent({ organizationId, onError, onSucce
     }
   }
 
+  if (!invitePolicy.canViewInvitations) return null
+
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
@@ -118,13 +136,15 @@ function OrganizationMemberInvitationsContent({ organizationId, onError, onSucce
             >
               Quay lại thành viên
             </Button>
-            <Button
-              type="button"
-              leftIcon={<Mail size={16} />}
-              onClick={() => navigate(`/organizations/${organizationId}/members/invite`)}
-            >
-              Gửi lời mời
-            </Button>
+            {invitePolicy.canInviteMembers ? (
+              <Button
+                type="button"
+                leftIcon={<Mail size={16} />}
+                onClick={() => navigate(`/organizations/${organizationId}/members/invite`)}
+              >
+                Gửi lời mời
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>
@@ -147,7 +167,7 @@ function OrganizationMemberInvitationsContent({ organizationId, onError, onSucce
           <div className="grid grid-cols-1 gap-3">
             {pendingInvitations.map((invitation) => {
               const isEditing = editingInvitationId === invitation.invitationId
-              const canEdit = invitation.status === 'pending'
+              const rowPolicy = getOrganizationInvitationRowPolicy(permissions, invitation)
 
               return (
                 <article key={invitation.invitationId} className="rounded-xl border border-neutral-200 bg-white p-4">
@@ -169,7 +189,7 @@ function OrganizationMemberInvitationsContent({ organizationId, onError, onSucce
                   <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     {isEditing ? (
                       <Select className="sm:max-w-56" value={invitationDraftRole} onChange={(event) => setInvitationDraftRole(event.target.value)}>
-                        {organizationRoleOptions.map((role) => (
+                        {rowPolicy.editableRoles.map((role) => (
                           <option key={role} value={role}>
                             {organizationRoleLabels[role]} ({role})
                           </option>
@@ -193,27 +213,31 @@ function OrganizationMemberInvitationsContent({ organizationId, onError, onSucce
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          leftIcon={<Pencil size={16} />}
-                          disabled={!canEdit}
-                          onClick={() => handleEditInvitation(invitation)}
-                        >
-                          Sửa
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          leftIcon={<Trash2 size={16} />}
-                          disabled={!canEdit}
-                          loading={cancelingInvitationId === invitation.invitationId}
-                          onClick={() => handleCancelInvitation(invitation)}
-                        >
-                          Hủy mời
-                        </Button>
-                      </div>
+                      rowPolicy.canEdit || rowPolicy.canCancel ? (
+                        <div className="flex justify-end gap-2">
+                          {rowPolicy.canEdit ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              leftIcon={<Pencil size={16} />}
+                              onClick={() => handleEditInvitation(invitation)}
+                            >
+                              Sửa
+                            </Button>
+                          ) : null}
+                          {rowPolicy.canCancel ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              leftIcon={<Trash2 size={16} />}
+                              loading={cancelingInvitationId === invitation.invitationId}
+                              onClick={() => handleCancelInvitation(invitation)}
+                            >
+                              Hủy mời
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : null
                     )}
                   </div>
                 </article>
@@ -233,11 +257,12 @@ function OrganizationMemberInvitationsPage() {
 
   return (
     <OrganizationCaseLayout error={error} successMessage={successMessage} onError={setError}>
-      {() => (
+      {(_, context) => (
         <OrganizationMemberInvitationsContent
           organizationId={Number(organizationId)}
           onError={setError}
           onSuccess={setSuccessMessage}
+          permissions={context.permissions}
         />
       )}
     </OrganizationCaseLayout>

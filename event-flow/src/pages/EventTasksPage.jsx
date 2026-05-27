@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ClipboardList, Eye, Pencil, Plus, Sparkles, Trash2, TriangleAlert, X } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import { aiApi, taskApi, teamApi, teamMemberApi } from '../api'
 import { normalizePageResponse } from '../api/response'
@@ -57,13 +57,14 @@ function normalizeTaskPage(responseData, pageSize = DEFAULT_TASKS_PER_PAGE) {
   }
 }
 
-function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSuccess }) {
+function EventTasksContent({ eventDetail, organizationId, eventId, accessContext, onError, onSuccess }) {
   const navigate = useNavigate()
   const [tasks, setTasks] = useState([])
   const [teams, setTeams] = useState([])
   const [teamMembers, setTeamMembers] = useState([])
   const [taskForm, setTaskForm] = useState(emptyTaskForm)
   const [taskDrafts, setTaskDrafts] = useState([])
+  const [aiContext, setAiContext] = useState('')
   const [pendingDeleteTask, setPendingDeleteTask] = useState(null)
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [currentPage, setCurrentPage] = useState(1)
@@ -231,7 +232,7 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
     onSuccess(null)
 
     try {
-      const response = await aiApi.suggestTasks(eventId)
+      const response = await aiApi.suggestTasks(eventId, { additionalContext: aiContext.trim() })
       const suggestions = response.data?.tasks || []
       if (suggestions.length === 0) {
         onSuccess('AI chưa trả về công việc gợi ý')
@@ -316,7 +317,8 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
 
   const filteredTasks = statusFilter === 'ALL' ? tasks : tasks.filter((task) => String(task.status || 'TODO') === statusFilter)
   const pagedTasks = filteredTasks
-  const canCreateTask = canCreateTaskForEvent(eventDetail)
+  const canManageTasks = canManageEventTasks(accessContext)
+  const canCreateTask = canManageTasks && canCreateTaskForEvent(eventDetail)
   const taskBlockedMessage = getTaskCreationBlockedMessage(eventDetail)
 
   function handleStatusFilterChange(event) {
@@ -374,7 +376,15 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
       <Card
         title="Danh sách công việc"
       >
-        {!canCreateTask ? (
+        {!canManageTasks ? (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary-bg p-4 text-sm text-primary">
+            <Eye size={18} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold">Chỉ hiển thị công việc được giao</p>
+              <p className="mt-1 text-primary">Bạn đang xem danh sách công việc được phân công cho tài khoản của mình trong sự kiện này.</p>
+            </div>
+          </div>
+        ) : !canCreateTask ? (
           <div className="mb-4 flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-bg p-4 text-sm text-warning">
             <TriangleAlert size={18} className="mt-0.5 shrink-0" />
             <div>
@@ -396,6 +406,16 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
                   Thêm công việc
                 </Button>
               </div>
+            </div>
+            <div className="mb-4 rounded-lg border border-neutral-200 bg-white p-3">
+              <FormField label="Ngữ cảnh cho AI">
+                <Textarea
+                  value={aiContext}
+                  onChange={(event) => setAiContext(event.target.value)}
+                  rows={3}
+                  placeholder="Ví dụ: ưu tiên công việc trong ngày diễn ra, cần checklist bàn giao rõ, có vendor âm thanh riêng, tránh tạo task chuẩn bị đã hoàn tất..."
+                />
+              </FormField>
             </div>
             {errors.batch ? <p className="mb-3 text-sm font-medium text-danger">{errors.batch}</p> : null}
             <div className="rounded-lg border border-neutral-200 bg-white p-4">
@@ -579,19 +599,23 @@ function EventTasksContent({ eventDetail, organizationId, eventId, onError, onSu
                         <Button type="button" variant="secondary" size="sm" leftIcon={<Eye size={16} />} onClick={() => navigate(`./${task.id}`)}>
                           Xem
                         </Button>
-                        <Button type="button" variant="primary" size="sm" leftIcon={<Pencil size={16} />} onClick={() => navigate(`./${task.id}/edit`)}>
-                          Sửa
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="danger"
-                          size="sm"
-                          leftIcon={<Trash2 size={16} />}
-                          loading={actionId === `delete-${task.id}`}
-                          onClick={() => setPendingDeleteTask(task)}
-                        >
-                          Xóa
-                        </Button>
+                        {canManageTasks ? (
+                          <>
+                            <Button type="button" variant="primary" size="sm" leftIcon={<Pencil size={16} />} onClick={() => navigate(`./${task.id}/edit`)}>
+                              Sửa
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="danger"
+                              size="sm"
+                              leftIcon={<Trash2 size={16} />}
+                              loading={actionId === `delete-${task.id}`}
+                              onClick={() => setPendingDeleteTask(task)}
+                            >
+                              Xóa
+                            </Button>
+                          </>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -636,14 +660,19 @@ function EventTasksPage() {
 
   return (
     <EventCaseLayout error={error} successMessage={successMessage} onError={setError}>
-      {({ eventDetail, organizationId }) => (
-        <EventTasksContent
-          eventDetail={eventDetail}
-          organizationId={organizationId}
-          eventId={Number(eventId)}
-          onError={setError}
-          onSuccess={setSuccessMessage}
-        />
+      {({ eventDetail, organizationId, accessContext }) => (
+        canManageEventTasks(accessContext) ? (
+          <EventTasksContent
+            eventDetail={eventDetail}
+            organizationId={organizationId}
+            eventId={Number(eventId)}
+            accessContext={accessContext}
+            onError={setError}
+            onSuccess={setSuccessMessage}
+          />
+        ) : (
+          <Navigate to={`/organizations/${organizationId}/events/${eventId}/assigned-tasks`} replace />
+        )
       )}
     </EventCaseLayout>
   )
@@ -658,6 +687,10 @@ function canCreateTaskForEvent(eventDetail) {
 
   if (end && now > end) return false
   return true
+}
+
+function canManageEventTasks(accessContext) {
+  return Array.isArray(accessContext?.allowedActions) && accessContext.allowedActions.includes('TASK_MANAGE')
 }
 
 function getTaskCreationBlockedMessage(eventDetail) {

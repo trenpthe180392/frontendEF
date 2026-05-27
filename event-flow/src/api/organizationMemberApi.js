@@ -10,6 +10,8 @@ export const organizationMemberApi = {
   updateInvitation: (invitationId, data) =>
     apiClient.patch(`/organization-members/invitations/${invitationId}`, data),
   cancelInvitation: (invitationId) => apiClient.delete(`/organization-members/invitations/${invitationId}`),
+  updateRole: (organizationId, userId, data) =>
+    apiClient.put(`/organization-members/${organizationId}/users/${userId}/role`, data),
   remove: (organizationId, userId) =>
     apiClient.delete(`/organization-members/${organizationId}/users/${userId}`),
 }

@@ -14,6 +14,7 @@ import { eventTypeOptions, getEventStatusLabel } from './eventConstants'
 import { formatCurrency } from '../../utils/dateFormat'
 
 function EventsPanel({
+  canManageEvents = false,
   events,
   eventForm,
   eventErrors,
@@ -45,7 +46,8 @@ function EventsPanel({
       <Card
         title="Danh sách sự kiện"
         headerRight={
-          <div className="flex flex-wrap gap-2">
+          canManageEvents ? (
+            <div className="flex flex-wrap gap-2">
             <Button
               variant={isEventFormOpen ? 'secondary' : 'primary'}
               size="sm"
@@ -54,10 +56,11 @@ function EventsPanel({
             >
                 {isEventFormOpen ? 'Đóng form' : 'Tạo sự kiện'}
             </Button>
-          </div>
+            </div>
+          ) : null
         }
       >
-        {isEventFormOpen ? (
+        {canManageEvents && isEventFormOpen ? (
           <form className="mb-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4" onSubmit={onSubmit} noValidate>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-base font-semibold text-neutral-900">{isEditing ? 'Cập nhật sự kiện' : 'Tạo sự kiện'}</h3>
@@ -105,26 +108,6 @@ function EventsPanel({
                   value={eventForm.endTime}
                   onChange={onChange}
                   error={eventErrors.endTime}
-                />
-              </FormField>
-
-              <FormField label="Mở đăng ký" error={eventErrors.registrationStart}>
-                <Input
-                  name="registrationStart"
-                  type="datetime-local"
-                  value={eventForm.registrationStart}
-                  onChange={onChange}
-                  error={eventErrors.registrationStart}
-                />
-              </FormField>
-
-              <FormField label="Hạn đăng ký" error={eventErrors.registrationDeadline}>
-                <Input
-                  name="registrationDeadline"
-                  type="datetime-local"
-                  value={eventForm.registrationDeadline}
-                  onChange={onChange}
-                  error={eventErrors.registrationDeadline}
                 />
               </FormField>
 
@@ -262,28 +245,32 @@ function EventsPanel({
                     <Button variant="ghost" size="sm" leftIcon={<Eye size={16} />} onClick={() => onViewEvent(event)}>
                       Xem
                     </Button>
-                    <Button variant="ghost" size="sm" leftIcon={<Pencil size={16} />} onClick={() => onEdit(event)}>
-                      Sửa
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      leftIcon={<X size={16} />}
-                      loading={eventActionId === `cancel-${event.eventId}`}
-                      disabled={event.status === 'cancelled' || event.status === 'deleted'}
-                      onClick={() => onCancelEvent(event)}
-                    >
-                      Hủy event
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      leftIcon={<Trash2 size={16} />}
-                      loading={eventActionId === `delete-${event.eventId}`}
-                      onClick={() => onDeleteEvent(event)}
-                    >
-                      Xóa
-                    </Button>
+                    {canManageEvents ? (
+                      <>
+                        <Button variant="ghost" size="sm" leftIcon={<Pencil size={16} />} onClick={() => onEdit(event)}>
+                          Sửa
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          leftIcon={<X size={16} />}
+                          loading={eventActionId === `cancel-${event.eventId}`}
+                          disabled={event.status === 'cancelled' || event.status === 'deleted'}
+                          onClick={() => onCancelEvent(event)}
+                        >
+                          Hủy event
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          leftIcon={<Trash2 size={16} />}
+                          loading={eventActionId === `delete-${event.eventId}`}
+                          onClick={() => onDeleteEvent(event)}
+                        >
+                          Xóa
+                        </Button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               </article>

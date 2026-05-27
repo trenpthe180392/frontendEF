@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, CalendarDays, Plus } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -14,14 +14,27 @@ import { defaultEventForm, eventTypeOptions } from '../features/events/eventCons
 import { toEventPayload } from '../features/events/eventMappers'
 import { validateEventForm } from '../features/events/eventValidation'
 import OrganizationCaseLayout from '../features/organizations/OrganizationCaseLayout'
+import { getOrganizationEventPolicy, getOrganizationPermissions } from '../features/organizations/organizationPermissions'
 import { getErrorMessage, getFieldErrors, isSubscriptionGateError } from '../utils'
 
-function EventCreateContent({ organizationId, onError, onSuccess }) {
+function EventCreateContent({
+  organizationId,
+  onError,
+  onSuccess,
+  permissions = getOrganizationPermissions('MEMBER'),
+}) {
   const navigate = useNavigate()
   const [form, setForm] = useState(defaultEventForm)
   const [errors, setErrors] = useState({})
   const [subscriptionGateError, setSubscriptionGateError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const eventPolicy = getOrganizationEventPolicy(permissions)
+
+  useEffect(() => {
+    if (!eventPolicy.canManageEvents) {
+      navigate(`/organizations/${organizationId}/events`, { replace: true })
+    }
+  }, [eventPolicy.canManageEvents, navigate, organizationId])
 
   function handleChange(event) {
     const { name, type, checked, value } = event.target
@@ -39,6 +52,7 @@ function EventCreateContent({ organizationId, onError, onSuccess }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!eventPolicy.canManageEvents) return
     if (!validateForm()) return
 
     setIsSubmitting(true)
@@ -64,6 +78,8 @@ function EventCreateContent({ organizationId, onError, onSuccess }) {
       setIsSubmitting(false)
     }
   }
+
+  if (!eventPolicy.canManageEvents) return null
 
   return (
     <div className="space-y-4">
@@ -109,12 +125,6 @@ function EventCreateContent({ organizationId, onError, onSuccess }) {
             <FormField label="Thời gian kết thúc" required error={errors.endTime}>
               <Input name="endTime" type="datetime-local" value={form.endTime} onChange={handleChange} error={errors.endTime} />
             </FormField>
-            <FormField label="Mở đăng ký" error={errors.registrationStart}>
-              <Input name="registrationStart" type="datetime-local" value={form.registrationStart} onChange={handleChange} error={errors.registrationStart} />
-            </FormField>
-            <FormField label="Hạn đăng ký" error={errors.registrationDeadline}>
-              <Input name="registrationDeadline" type="datetime-local" value={form.registrationDeadline} onChange={handleChange} error={errors.registrationDeadline} />
-            </FormField>
             <FormField label="Địa điểm" error={errors.location}>
               <Input name="location" value={form.location} onChange={handleChange} placeholder="VD: Gem Center, TP.HCM" />
             </FormField>
@@ -158,11 +168,6 @@ function EventCreateContent({ organizationId, onError, onSuccess }) {
 function normalizeEventFieldErrors(fieldErrors) {
   const nextErrors = { ...fieldErrors }
 
-  if (nextErrors.registrationDeadlineBeforeStartTime) {
-    nextErrors.registrationDeadline = nextErrors.registrationDeadlineBeforeStartTime
-    delete nextErrors.registrationDeadlineBeforeStartTime
-  }
-
   if (nextErrors.endTimeAfterStartTime) {
     nextErrors.endTime = nextErrors.endTimeAfterStartTime
     delete nextErrors.endTimeAfterStartTime
@@ -178,11 +183,12 @@ function EventCreatePage() {
 
   return (
     <OrganizationCaseLayout error={error} successMessage={successMessage} onError={setError}>
-      {() => (
+      {(_, context) => (
         <EventCreateContent
           organizationId={Number(organizationId)}
           onError={setError}
           onSuccess={setSuccessMessage}
+          permissions={context.permissions}
         />
       )}
     </OrganizationCaseLayout>

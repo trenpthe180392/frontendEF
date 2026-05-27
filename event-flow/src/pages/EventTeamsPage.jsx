@@ -57,6 +57,7 @@ function EventTeamsContent({ organizationId, eventId, onError, onSuccess }) {
   const [initialMembers, setInitialMembers] = useState([])
   const [teamForm, setTeamForm] = useState(emptyTeamForm)
   const [teamDrafts, setTeamDrafts] = useState([])
+  const [aiContext, setAiContext] = useState('')
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
@@ -182,7 +183,7 @@ function EventTeamsContent({ organizationId, eventId, onError, onSuccess }) {
     onSuccess(null)
 
     try {
-      const response = await aiApi.suggestTeams(eventId)
+      const response = await aiApi.suggestTeams(eventId, { additionalContext: aiContext.trim() })
       const suggestions = response.data?.teams || []
       if (suggestions.length === 0) {
         onSuccess('AI chưa trả về đội nhóm gợi ý')
@@ -317,6 +318,16 @@ function EventTeamsContent({ organizationId, eventId, onError, onSuccess }) {
             <Button type="button" variant="secondary" size="sm" loading={isSuggesting} leftIcon={<Sparkles size={16} />} onClick={handleSuggestTeams}>
               Gợi ý AI
             </Button>
+          </div>
+          <div className="mb-4 rounded-lg border border-neutral-200 bg-white p-3">
+            <FormField label="Ngữ cảnh cho AI">
+              <Textarea
+                value={aiContext}
+                onChange={(event) => setAiContext(event.target.value)}
+                rows={3}
+                placeholder="Ví dụ: sự kiện có nhiều khách mời doanh nghiệp, cần đội tài trợ riêng, ưu tiên check-in nhanh và kiểm soát rủi ro hiện trường..."
+              />
+            </FormField>
           </div>
 
           <div className="rounded-lg border border-neutral-200 bg-white p-3">

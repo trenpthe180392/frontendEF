@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Inbox, Mail, UserPlus } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -10,16 +10,23 @@ import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import OrganizationCaseLayout from '../features/organizations/OrganizationCaseLayout'
 import { defaultMemberForm } from '../features/organizations/organizationConstants'
-import { organizationRoleLabels, organizationRoleOptions } from '../features/organizations/organizationRoles'
+import { getOrganizationInvitePolicy, getOrganizationPermissions } from '../features/organizations/organizationPermissions'
+import { organizationRoleLabels } from '../features/organizations/organizationRoles'
 import { getErrorMessage } from '../utils'
 import { normalizeOrganizationInvitation } from '../utils/organizationMappers'
 
-function OrganizationMemberInviteContent({ organizationId, onError, onSuccess }) {
+function OrganizationMemberInviteContent({
+  organizationId,
+  onError,
+  onSuccess,
+  permissions = getOrganizationPermissions('MEMBER'),
+}) {
   const navigate = useNavigate()
   const [form, setForm] = useState(defaultMemberForm)
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  const invitePolicy = useMemo(() => getOrganizationInvitePolicy(permissions), [permissions])
 
   async function loadPendingInvitations() {
     try {
@@ -37,6 +44,17 @@ function OrganizationMemberInviteContent({ organizationId, onError, onSuccess })
     loadPendingInvitations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId])
+
+  useEffect(() => {
+    if (!invitePolicy.canInviteMembers) {
+      navigate(`/organizations/${organizationId}/members`, { replace: true })
+      return
+    }
+
+    if (invitePolicy.assignableRoles.length > 0 && !invitePolicy.assignableRoles.includes(form.role)) {
+      setForm((current) => ({ ...current, role: invitePolicy.assignableRoles[0] }))
+    }
+  }, [form.role, invitePolicy.assignableRoles, invitePolicy.canInviteMembers, navigate, organizationId])
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -56,7 +74,7 @@ function OrganizationMemberInviteContent({ organizationId, onError, onSuccess })
     }
 
     if (!form.role) nextErrors.role = 'Vui lòng chọn vai trò'
-    if (!organizationRoleOptions.includes(form.role)) nextErrors.role = 'Vai trò không hợp lệ'
+    if (!invitePolicy.assignableRoles.includes(form.role)) nextErrors.role = 'Vai trò không hợp lệ'
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -86,6 +104,8 @@ function OrganizationMemberInviteContent({ organizationId, onError, onSuccess })
     }
   }
 
+  if (!invitePolicy.canInviteMembers) return null
+
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
@@ -96,21 +116,23 @@ function OrganizationMemberInviteContent({ organizationId, onError, onSuccess })
               Nhập email tài khoản đã đăng ký và chọn vai trò trong tổ chức cho thành viên mới.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            leftIcon={<Inbox size={16} />}
-            onClick={() => navigate(`/organizations/${organizationId}/members/invitations`)}
-          >
-            <span className="inline-flex items-center gap-2">
-              Lời mời đang xử lý
-              {pendingCount > 0 ? (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-xs font-bold text-white">
-                  {pendingCount}
-                </span>
-              ) : null}
-            </span>
-          </Button>
+          {invitePolicy.canViewInvitations ? (
+            <Button
+              type="button"
+              variant="secondary"
+              leftIcon={<Inbox size={16} />}
+              onClick={() => navigate(`/organizations/${organizationId}/members/invitations`)}
+            >
+              <span className="inline-flex items-center gap-2">
+                Lời mời đang xử lý
+                {pendingCount > 0 ? (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-xs font-bold text-white">
+                    {pendingCount}
+                  </span>
+                ) : null}
+              </span>
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="secondary"
@@ -138,7 +160,7 @@ function OrganizationMemberInviteContent({ organizationId, onError, onSuccess })
             </FormField>
             <FormField label="Vai trò sau khi xác nhận" required error={errors.role}>
               <Select name="role" value={form.role} onChange={handleChange}>
-                {organizationRoleOptions.map((role) => (
+                {invitePolicy.assignableRoles.map((role) => (
                   <option key={role} value={role}>
                     {organizationRoleLabels[role]} ({role})
                   </option>
@@ -168,11 +190,12 @@ function OrganizationMemberInvitePage() {
 
   return (
     <OrganizationCaseLayout error={error} successMessage={successMessage} onError={setError}>
-      {() => (
+      {(_, context) => (
         <OrganizationMemberInviteContent
           organizationId={Number(organizationId)}
           onError={setError}
           onSuccess={setSuccessMessage}
+          permissions={context.permissions}
         />
       )}
     </OrganizationCaseLayout>

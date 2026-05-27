@@ -47,7 +47,7 @@ function EventCaseLayout({ children, error, successMessage, onError }) {
 
   return (
     <OrganizationCaseLayout error={error} successMessage={successMessage} onError={onError}>
-      {() =>
+      {(_, layoutContext) =>
         isLoading ? (
           <Card>
             <div className="flex min-h-[360px] items-center justify-center">
@@ -55,7 +55,13 @@ function EventCaseLayout({ children, error, successMessage, onError }) {
             </div>
           </Card>
         ) : eventDetail ? (
-          children({ eventDetail, organizationId: Number(organizationId), eventId: Number(eventId), reloadEvent: loadEvent })
+          children({
+            eventDetail,
+            organizationId: Number(organizationId),
+            eventId: Number(eventId),
+            reloadEvent: loadEvent,
+            accessContext: layoutContext?.accessContext,
+          })
         ) : (
           <Card>
             <EmptyState
@@ -170,9 +176,7 @@ export function EventInfoPanel({ eventDetail, organizationId, onError, onSuccess
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 p-5 text-sm md:grid-cols-3">
-        <InfoPill icon={<CalendarDays size={16} />} label="Mở đăng ký" value={formatDateTime(eventDetail.registrationStart)} />
-        <InfoPill icon={<CheckCircle2 size={16} />} label="Hạn đăng ký" value={formatDateTime(eventDetail.registrationDeadline)} />
+      <div className="grid grid-cols-1 gap-4 p-5 text-sm md:grid-cols-1">
         <InfoPill icon={<Wallet size={16} />} label="Ngân sách dự kiến" value={formatCurrency(eventDetail.estimatedBudget)} />
       </div>
       <div className="border-t border-neutral-100 p-5">
@@ -232,31 +236,11 @@ export function EventInfoPanel({ eventDetail, organizationId, onError, onSuccess
   )
 }
 
-export function EventWorkspaceHeader({ title, description, icon, actions = null, stats = [] }) {
+export function EventWorkspaceHeader({ title, actions = null }) {
   return (
-    <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-bg text-primary">
-            {icon}
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-neutral-900">{title}</h1>
-            {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-500">{description}</p> : null}
-          </div>
-        </div>
-        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
-      </div>
-      {stats.length > 0 ? (
-        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <div key={stat.label} className="rounded-xl bg-neutral-50 p-3">
-              <p className="text-xs font-medium text-neutral-500">{stat.label}</p>
-              <p className="mt-1 text-xl font-bold text-neutral-900">{stat.value}</p>
-            </div>
-          ))}
-        </div>
-      ) : null}
+    <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <h1 className="text-xl font-bold text-neutral-900">{title}</h1>
+      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
     </section>
   )
 }

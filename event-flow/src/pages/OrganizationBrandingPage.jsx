@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, Building2, Image, RefreshCw, Trash2, Upload } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { organizationBrandingApi } from '../api'
 import { getApiMessage, unwrapResponse } from '../api/response'
@@ -13,6 +13,7 @@ import PageHeader from '../components/layout/PageHeader'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
 import OrganizationCaseLayout from '../features/organizations/OrganizationCaseLayout'
+import { getOrganizationBrandingPolicy, getOrganizationPermissions } from '../features/organizations/organizationPermissions'
 import { cn, getErrorMessage, isSubscriptionGateError } from '../utils'
 
 const allowedLogoTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
@@ -24,19 +25,26 @@ function OrganizationBrandingPage() {
 
   return (
     <OrganizationCaseLayout error={layoutError} successMessage={successMessage} onError={setLayoutError}>
-      {(organization) => (
+      {(organization, context) => (
         <OrganizationBrandingContent
           organization={organization}
           onError={setLayoutError}
           onSuccess={setSuccessMessage}
+          permissions={context.permissions}
         />
       )}
     </OrganizationCaseLayout>
   )
 }
 
-function OrganizationBrandingContent({ organization, onError, onSuccess }) {
+function OrganizationBrandingContent({
+  organization,
+  onError,
+  onSuccess,
+  permissions = getOrganizationPermissions('MEMBER'),
+}) {
   const { organizationId } = useParams()
+  const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [branding, setBranding] = useState(null)
   const [error, setError] = useState(null)
@@ -50,8 +58,11 @@ function OrganizationBrandingContent({ organization, onError, onSuccess }) {
   const logoUrl = branding?.logoUrl || ''
   const hasLogo = Boolean(logoUrl)
   const hasSubscriptionGateError = isSubscriptionGateError(errorDetail)
+  const brandingPolicy = getOrganizationBrandingPolicy(permissions)
 
   const loadBranding = useCallback(async () => {
+    if (!brandingPolicy.canManageBranding) return
+
     setIsLoading(true)
     setError(null)
     setErrorDetail(null)
@@ -66,17 +77,24 @@ function OrganizationBrandingContent({ organization, onError, onSuccess }) {
     } finally {
       setIsLoading(false)
     }
-  }, [organization, organizationId])
+  }, [brandingPolicy.canManageBranding, organization, organizationId])
 
   useEffect(() => {
+    if (!brandingPolicy.canManageBranding) {
+      navigate(`/organizations/${organizationId}`, { replace: true })
+      return
+    }
+
     loadBranding()
-  }, [loadBranding])
+  }, [brandingPolicy.canManageBranding, loadBranding, navigate, organizationId])
 
   function handleChooseLogo() {
     fileInputRef.current?.click()
   }
 
   async function handleLogoChange(event) {
+    if (!brandingPolicy.canManageBranding) return
+
     const file = event.target.files?.[0]
     event.target.value = ''
 
@@ -121,6 +139,7 @@ function OrganizationBrandingContent({ organization, onError, onSuccess }) {
   }
 
   async function handleDeleteLogo() {
+    if (!brandingPolicy.canManageBranding) return
     if (!hasLogo) return
 
     setIsDeleting(true)
@@ -146,6 +165,8 @@ function OrganizationBrandingContent({ organization, onError, onSuccess }) {
       setIsDeleteOpen(false)
     }
   }
+
+  if (!brandingPolicy.canManageBranding) return null
 
   return (
     <div className="space-y-4">

@@ -12,16 +12,28 @@ import Textarea from '../components/ui/Textarea'
 import { defaultDepartmentForm } from '../features/departments/departmentConstants'
 import { normalizeDepartment } from '../features/departments/departmentMappers'
 import OrganizationCaseLayout from '../features/organizations/OrganizationCaseLayout'
+import { getOrganizationDepartmentPolicy, getOrganizationPermissions } from '../features/organizations/organizationPermissions'
 import { getErrorMessage } from '../utils'
 
-function DepartmentCreateContent({ organizationId, onError, onSuccess }) {
+function DepartmentCreateContent({
+  organizationId,
+  onError,
+  onSuccess,
+  permissions = getOrganizationPermissions('MEMBER'),
+}) {
   const navigate = useNavigate()
   const [departments, setDepartments] = useState([])
   const [form, setForm] = useState(defaultDepartmentForm)
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const departmentPolicy = getOrganizationDepartmentPolicy(permissions)
 
   useEffect(() => {
+    if (!departmentPolicy.canManageDepartments) {
+      navigate(`/organizations/${organizationId}/departments`, { replace: true })
+      return
+    }
+
     async function loadDepartments() {
       try {
         const response = await departmentApi.getByOrganization(organizationId)
@@ -32,7 +44,7 @@ function DepartmentCreateContent({ organizationId, onError, onSuccess }) {
     }
 
     loadDepartments()
-  }, [organizationId, onError])
+  }, [departmentPolicy.canManageDepartments, navigate, organizationId, onError])
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -52,6 +64,7 @@ function DepartmentCreateContent({ organizationId, onError, onSuccess }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!departmentPolicy.canManageDepartments) return
     if (!validateForm()) return
 
     setIsSubmitting(true)
@@ -74,6 +87,8 @@ function DepartmentCreateContent({ organizationId, onError, onSuccess }) {
       setIsSubmitting(false)
     }
   }
+
+  if (!departmentPolicy.canManageDepartments) return null
 
   return (
     <div className="space-y-4">
@@ -143,11 +158,12 @@ function DepartmentCreatePage() {
 
   return (
     <OrganizationCaseLayout error={error} successMessage={successMessage} onError={setError}>
-      {() => (
+      {(_, context) => (
         <DepartmentCreateContent
           organizationId={Number(organizationId)}
           onError={setError}
           onSuccess={setSuccessMessage}
+          permissions={context.permissions}
         />
       )}
     </OrganizationCaseLayout>

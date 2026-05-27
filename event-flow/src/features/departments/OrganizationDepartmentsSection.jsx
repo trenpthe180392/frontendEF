@@ -7,11 +7,18 @@ import ConfirmDialog from '../../components/feedback/ConfirmDialog'
 import { getErrorMessage } from '../../utils'
 import { formatDateTime } from '../../utils/dateFormat'
 import { normalizeOrganizationMember } from '../../utils/organizationMappers'
+import { getOrganizationDepartmentPolicy, getOrganizationPermissions } from '../organizations/organizationPermissions'
 import { defaultDepartmentForm, defaultDepartmentMemberForm } from './departmentConstants'
 import { normalizeDepartment, normalizeDepartmentMember } from './departmentMappers'
 import DepartmentsPanel from './DepartmentsPanel'
 
-function OrganizationDepartmentsSection({ organizationId, onError, onSuccess, onCountChange }) {
+function OrganizationDepartmentsSection({
+  organizationId,
+  onError,
+  onSuccess,
+  onCountChange,
+  permissions = getOrganizationPermissions('MEMBER'),
+}) {
   const navigate = useNavigate()
   const [departments, setDepartments] = useState([])
   const [members, setMembers] = useState([])
@@ -30,6 +37,7 @@ function OrganizationDepartmentsSection({ organizationId, onError, onSuccess, on
   const availableDepartmentMembers = selectedDepartment
     ? members.filter((member) => !departmentMembers.some((departmentMember) => Number(departmentMember.userId) === Number(member.userId)))
     : members
+  const departmentPolicy = getOrganizationDepartmentPolicy(permissions)
 
   useEffect(() => {
     async function loadDepartments() {
@@ -211,6 +219,7 @@ function OrganizationDepartmentsSection({ organizationId, onError, onSuccess, on
   return (
     <>
       <DepartmentsPanel
+        canManageDepartments={departmentPolicy.canManageDepartments}
         departmentForm={departmentForm}
         departmentErrors={departmentErrors}
         departments={departments}

@@ -51,17 +51,18 @@ function TeamDashboardContent({ teamId, onError }) {
   const columnData = dashboard?.columnChartData || []
   const lineData = dashboard?.lineChartData || []
   const totalTasks = columnData.reduce((total, item) => total + Number(item.count || 0), 0)
+  const updateCount = countUpdates(lineData)
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
         <MetricCard icon={<ClipboardList size={18} />} label="Tổng công việc" value={totalTasks} />
-        <MetricCard icon={<Activity size={18} />} label="Cập nhật" value={countUpdates(lineData)} />
+        <MetricCard icon={<Activity size={18} />} label="Cập nhật" value={updateCount} />
         <MetricCard icon={<BarChart3 size={18} />} label="Trạng thái" value={columnData.length} />
       </div>
 
       <Card title="Cập nhật công việc theo ngày">
-        {lineData.length === 0 ? (
+        {lineData.length === 0 || updateCount === 0 ? (
           <EmptyState icon={<Activity size={24} />} title="Chưa có dữ liệu" description="Khi công việc đổi trạng thái, biểu đồ sẽ cập nhật theo ngày." />
         ) : (
           <MiniLineChart data={lineData} />
@@ -115,7 +116,7 @@ function MiniLineChart({ data }) {
           </text>
         ))}
         {chart.lines.map((line) => (
-          <polyline key={line.key} fill="none" stroke={line.color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" points={line.points} />
+          <path key={line.key} d={line.path} fill="none" stroke={line.color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" vectorEffect="non-scaling-stroke" />
         ))}
         <line x1="56" x2="828" y1="274" y2="274" stroke="var(--color-neutral-300)" />
         <line x1="56" x2="56" y1="24" y2="274" stroke="var(--color-neutral-300)" />
@@ -179,10 +180,15 @@ function buildLineChart(data) {
   const formatDate = (date) => new globalThis.Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit' }).format(new Date(date))
 
   return {
-    lines: statusSeries.map((series) => ({
-      ...series,
-      points: data.map((item, index) => `${left + index * stepX},${scaleY(item[series.key])}`).join(' '),
-    })),
+    lines: statusSeries.map((series) => {
+      const nodes = data.map((item, index) => ({ x: left + index * stepX, y: scaleY(item[series.key]) }))
+      const total = data.reduce((sum, item) => sum + Number(item[series.key] || 0), 0)
+      return {
+        ...series,
+        path: nodes.map((node, index) => `${index === 0 ? 'M' : 'L'} ${node.x} ${node.y}`).join(' '),
+        total,
+      }
+    }).filter((line) => line.total > 0),
     yTicks: Array.from({ length: 6 }, (_, index) => {
       const value = Math.round((yMax / 5) * index)
       return { value, y: scaleY(value) }

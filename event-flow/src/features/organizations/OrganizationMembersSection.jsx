@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Eye, Mail, Trash2, UserCheck, UserPlus, Users } from 'lucide-react'
+import { Eye, Mail, Pencil, Trash2, UserCheck, UserPlus, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { organizationMemberApi } from '../../api'
@@ -9,6 +9,7 @@ import EmptyState from '../../components/layout/EmptyState'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import PaginationControls from '../../components/ui/PaginationControls'
+import Select from '../../components/ui/Select'
 import { getErrorMessage } from '../../utils'
 import { normalizeOrganizationInvitation, normalizeOrganizationMember } from '../../utils/organizationMappers'
 import { statusVariant } from './organizationConstants'
@@ -17,6 +18,11 @@ import {
   organizationRoleLabels,
   privilegedOrganizationRoles,
 } from './organizationRoles'
+import {
+  getOrganizationMemberRowPolicy,
+  getOrganizationMembersToolbarPolicy,
+  getOrganizationPermissions,
+} from './organizationPermissions'
 const DEFAULT_MEMBERS_PER_PAGE = 10
 
 function normalizeMemberPage(responseData, pageSize = DEFAULT_MEMBERS_PER_PAGE) {
@@ -38,7 +44,14 @@ function normalizeMemberPage(responseData, pageSize = DEFAULT_MEMBERS_PER_PAGE) 
   }
 }
 
-function OrganizationMembersSection({ organizationId, onError, onSuccess, onCountChange }) {
+function OrganizationMembersSection({
+  organizationId,
+  currentMembership,
+  onError,
+  onSuccess,
+  onCountChange,
+  permissions = getOrganizationPermissions('MEMBER'),
+}) {
   const navigate = useNavigate()
   const [members, setMembers] = useState([])
   const [removingUserId, setRemovingUserId] = useState(null)
@@ -48,34 +61,66 @@ function OrganizationMembersSection({ organizationId, onError, onSuccess, onCoun
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [pendingInvitationCount, setPendingInvitationCount] = useState(0)
+  const [editingMemberId, setEditingMemberId] = useState(null)
+  const [roleDraft, setRoleDraft] = useState('MEMBER')
+  const [updatingMemberId, setUpdatingMemberId] = useState(null)
 
   const activeMemberCount = members.filter((member) => member.status === 'active').length
+  const toolbarPolicy = getOrganizationMembersToolbarPolicy(permissions)
+
+  async function loadMembers() {
+    try {
+      const [membersResponse, invitationsResponse] = await Promise.all([
+        organizationMemberApi.getByOrganization(organizationId, { page: currentPage - 1, size: pageSize }),
+        toolbarPolicy.canViewInvitations ? organizationMemberApi.getInvitations(organizationId) : Promise.resolve({ data: [] }),
+      ])
+      const memberPage = normalizeMemberPage(membersResponse.data, pageSize)
+      const normalizedMembers = memberPage.content.map(normalizeOrganizationMember)
+      const pendingCount = (invitationsResponse.data || [])
+        .map(normalizeOrganizationInvitation)
+        .filter((invitation) => invitation.status === 'pending').length
+      setMembers(normalizedMembers)
+      setTotalElements(memberPage.totalElements)
+      setTotalPages(memberPage.totalPages)
+      setCurrentPage(memberPage.number + 1)
+      setPendingInvitationCount(pendingCount)
+      onCountChange?.(memberPage.totalElements)
+    } catch (err) {
+      onError(getErrorMessage(err))
+    }
+  }
 
   useEffect(() => {
-    async function loadMembers() {
-      try {
-        const [membersResponse, invitationsResponse] = await Promise.all([
-          organizationMemberApi.getByOrganization(organizationId, { page: currentPage - 1, size: pageSize }),
-          organizationMemberApi.getInvitations(organizationId),
-        ])
-        const memberPage = normalizeMemberPage(membersResponse.data, pageSize)
-        const normalizedMembers = memberPage.content.map(normalizeOrganizationMember)
-        const pendingCount = (invitationsResponse.data || [])
-          .map(normalizeOrganizationInvitation)
-          .filter((invitation) => invitation.status === 'pending').length
-        setMembers(normalizedMembers)
-        setTotalElements(memberPage.totalElements)
-        setTotalPages(memberPage.totalPages)
-        setCurrentPage(memberPage.number + 1)
-        setPendingInvitationCount(pendingCount)
-        onCountChange?.(memberPage.totalElements)
-      } catch (err) {
-        onError(getErrorMessage(err))
-      }
-    }
-
     loadMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, currentPage, pageSize, onCountChange, onError])
+
+  function startEdit(member) {
+    setEditingMemberId(member.id)
+    const rowPolicy = getOrganizationMemberRowPolicy(permissions, currentMembership, member)
+    setRoleDraft(rowPolicy.editableRoles.includes(member.role) ? member.role : rowPolicy.editableRoles[0] || 'MEMBER')
+    onError(null)
+    onSuccess(null)
+  }
+
+  async function handleUpdateMember(member) {
+    if (!member?.userId) return
+
+    setUpdatingMemberId(member.id)
+    onError(null)
+    onSuccess(null)
+
+    try {
+      await organizationMemberApi.updateRole(organizationId, member.userId, { role: roleDraft })
+      setEditingMemberId(null)
+      await loadMembers()
+      onSuccess('Đã cập nhật vai trò thành viên tổ chức')
+    } catch (err) {
+      onError(getErrorMessage(err))
+    } finally {
+      setUpdatingMemberId(null)
+    }
+  }
 
   async function handleConfirmRemoveMember() {
     if (!pendingRemoveMember?.userId) return
@@ -90,14 +135,7 @@ function OrganizationMembersSection({ organizationId, onError, onSuccess, onCoun
       if (members.length === 1 && currentPage > 1) {
         setCurrentPage((page) => page - 1)
       } else {
-        const membersResponse = await organizationMemberApi.getByOrganization(organizationId, { page: currentPage - 1, size: pageSize })
-        const memberPage = normalizeMemberPage(membersResponse.data, pageSize)
-        const normalizedMembers = memberPage.content.map(normalizeOrganizationMember)
-        setMembers(normalizedMembers)
-        setTotalElements(memberPage.totalElements)
-        setTotalPages(memberPage.totalPages)
-        setCurrentPage(memberPage.number + 1)
-        onCountChange?.(memberPage.totalElements)
+        await loadMembers()
       }
       onSuccess('Đã xóa thành viên khỏi tổ chức')
     } catch (err) {
@@ -145,29 +183,33 @@ function OrganizationMembersSection({ organizationId, onError, onSuccess, onCoun
             noPadding
             headerRight={
               <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  leftIcon={<Mail size={16} />}
-                  className="relative"
-                  onClick={() => navigate(`/organizations/${organizationId}/members/invitations`)}
-                >
-                  {pendingInvitationCount > 0 ? (
-                    <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[11px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
-                      {pendingInvitationCount}
-                    </span>
-                  ) : null}
-                  Lời mời
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  leftIcon={<UserPlus size={16} />}
-                  onClick={() => navigate(`/organizations/${organizationId}/members/invite`)}
-                >
-                  Gửi lời mời
-                </Button>
+                {toolbarPolicy.canViewInvitations ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    leftIcon={<Mail size={16} />}
+                    className="relative"
+                    onClick={() => navigate(`/organizations/${organizationId}/members/invitations`)}
+                  >
+                    {pendingInvitationCount > 0 ? (
+                      <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[11px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
+                        {pendingInvitationCount}
+                      </span>
+                    ) : null}
+                    Lời mời
+                  </Button>
+                ) : null}
+                {toolbarPolicy.canInviteMembers ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    leftIcon={<UserPlus size={16} />}
+                    onClick={() => navigate(`/organizations/${organizationId}/members/invite`)}
+                  >
+                    Gửi lời mời
+                  </Button>
+                ) : null}
               </div>
             }
           />
@@ -187,7 +229,10 @@ function OrganizationMembersSection({ organizationId, onError, onSuccess, onCoun
           />
         ) : (
           <div className="grid grid-cols-1 gap-3">
-            {members.map((member) => (
+            {members.map((member) => {
+              const rowPolicy = getOrganizationMemberRowPolicy(permissions, currentMembership, member)
+
+              return (
               <article key={member.id} className="rounded-xl border border-neutral-200 bg-white p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
@@ -200,10 +245,14 @@ function OrganizationMembersSection({ organizationId, onError, onSuccess, onCoun
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={privilegedOrganizationRoles.has(member.role) ? 'warning' : 'info'}>
-                      {organizationRoleLabels[member.role] || member.role}
-                    </Badge>
-                    <Badge variant={statusVariant[member.status] || 'default'}>{member.status}</Badge>
+                    {editingMemberId !== member.id ? (
+                      <>
+                        <Badge variant={privilegedOrganizationRoles.has(member.role) ? 'warning' : 'info'}>
+                          {organizationRoleLabels[member.role] || member.role}
+                        </Badge>
+                        <Badge variant={statusVariant[member.status] || 'default'}>{member.status}</Badge>
+                      </>
+                    ) : null}
                     <Button
                       variant="secondary"
                       size="sm"
@@ -212,20 +261,51 @@ function OrganizationMembersSection({ organizationId, onError, onSuccess, onCoun
                     >
                       Xem
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      leftIcon={<Trash2 size={16} />}
-                      loading={removingUserId === member.userId}
-                      onClick={() => setPendingRemoveMember(member)}
-                    >
-                      Xóa
-                    </Button>
+                    {rowPolicy.canEditRole ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        leftIcon={<Pencil size={16} />}
+                        onClick={() => startEdit(member)}
+                      >
+                        Sửa
+                      </Button>
+                    ) : null}
+                    {rowPolicy.canRemove ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        leftIcon={<Trash2 size={16} />}
+                        loading={removingUserId === member.userId}
+                        onClick={() => setPendingRemoveMember(member)}
+                      >
+                        Xóa
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
-                <p className="mt-3 text-sm leading-5 text-neutral-500">{organizationRoleDescriptions[member.role] || 'Vai trò nội bộ trong tổ chức.'}</p>
+                {editingMemberId === member.id ? (
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[220px_auto_auto]">
+                    <Select value={roleDraft} onChange={(event) => setRoleDraft(event.target.value)}>
+                      {rowPolicy.editableRoles.map((role) => (
+                        <option key={role} value={role}>
+                          {organizationRoleLabels[role]} ({role})
+                        </option>
+                      ))}
+                    </Select>
+                    <Button size="sm" loading={updatingMemberId === member.id} onClick={() => handleUpdateMember(member)}>
+                      Lưu
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => setEditingMemberId(null)}>
+                      Hủy
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm leading-5 text-neutral-500">{organizationRoleDescriptions[member.role] || 'Vai trò nội bộ trong tổ chức.'}</p>
+                )}
               </article>
-            ))}
+              )
+            })}
           </div>
         )}
         <PaginationControls

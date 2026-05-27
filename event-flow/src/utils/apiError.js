@@ -7,6 +7,10 @@ export function getErrorMessage(error, fallback = 'Đã có lỗi xảy ra') {
     return 'Không kết nối được tới máy chủ. Vui lòng kiểm tra backend đang chạy rồi thử lại.'
   }
 
+  if (!error?.response && error?.code === 'ECONNABORTED') {
+    return 'AI phản hồi quá lâu. Vui lòng thử lại với ngữ cảnh ngắn hơn hoặc thử lại sau.'
+  }
+
   if (
     fields &&
     typeof fields === 'object' &&

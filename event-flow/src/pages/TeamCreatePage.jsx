@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Plus, Sparkles, Users, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { aiApi, eventMemberApi, teamApi } from '../api'
@@ -26,11 +26,26 @@ const emptyTeamForm = {
   initialMemberRole: 'MEMBER',
 }
 
+function createAiTeamDraft(suggestion, index) {
+  const name = suggestion?.name?.trim() || `Đội nhóm AI ${index + 1}`
+  return {
+    id: `ai-team-${Date.now()}-${index}`,
+    selected: true,
+    name,
+    teamType: suggestion?.teamType || 'OPERATIONS',
+    description: suggestion?.description || `Đội nhóm ${name} được AI gợi ý cho sự kiện này.`,
+    status: suggestion?.status || 'ACTIVE',
+  }
+}
+
 function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
   const navigate = useNavigate()
   const [eventMembers, setEventMembers] = useState([])
   const [initialMembers, setInitialMembers] = useState([])
   const [form, setForm] = useState(emptyTeamForm)
+  const [aiTeamDrafts, setAiTeamDrafts] = useState([])
+  const [aiContext, setAiContext] = useState('')
+  const [draftErrors, setDraftErrors] = useState({})
   const [errors, setErrors] = useState({})
   const [subscriptionGateError, setSubscriptionGateError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -91,26 +106,19 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
     onSuccess(null)
 
     try {
-      const response = await aiApi.suggestTeams(eventId)
+      const response = await aiApi.suggestTeams(eventId, { additionalContext: aiContext.trim() })
       const suggestions = response.data?.teams || []
-      const suggestion = suggestions[0]
 
-      if (!suggestion) {
-        onSuccess('AI chưa trả về đội nhóm gợi ý')
+      if (suggestions.length === 0) {
+        setAiTeamDrafts([])
+        onSuccess('AI chưa trả về danh sách đội nhóm gợi ý')
         return
       }
 
-      const name = suggestion.name?.trim() || 'Đội nhóm AI'
-      setForm((current) => ({
-        ...current,
-        name,
-        teamType: suggestion.teamType || current.teamType,
-        description: suggestion.description || `Đội nhóm ${name} được AI gợi ý cho sự kiện này.`,
-        status: suggestion.status || current.status,
-        addCreatorAsOwner: true,
-      }))
+      setAiTeamDrafts(suggestions.map(createAiTeamDraft))
+      setDraftErrors({})
       setErrors({})
-      onSuccess('AI đã điền gợi ý đội nhóm. Kiểm tra rồi lưu để tạo.')
+      onSuccess(`AI đã gợi ý ${suggestions.length} đội nhóm. Kiểm tra danh sách rồi tạo hàng loạt.`)
     } catch (err) {
       if (isSubscriptionGateError(err)) {
         setSubscriptionGateError(err)
@@ -119,6 +127,78 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
       }
     } finally {
       setIsSuggesting(false)
+    }
+  }
+
+  function handleDraftChange(draftId, field, value) {
+    setAiTeamDrafts((current) => current.map((draft) => (draft.id === draftId ? { ...draft, [field]: value } : draft)))
+    setDraftErrors((current) => ({ ...current, [draftId]: { ...current[draftId], [field]: null } }))
+    setSubscriptionGateError(null)
+    onSuccess(null)
+  }
+
+  function handleToggleDraft(draftId) {
+    setAiTeamDrafts((current) => current.map((draft) => (draft.id === draftId ? { ...draft, selected: !draft.selected } : draft)))
+    setErrors((current) => ({ ...current, aiDrafts: null }))
+  }
+
+  function handleRemoveDraft(draftId) {
+    setAiTeamDrafts((current) => current.filter((draft) => draft.id !== draftId))
+    setErrors((current) => ({ ...current, aiDrafts: null }))
+    setDraftErrors((current) => {
+      const next = { ...current }
+      delete next[draftId]
+      return next
+    })
+  }
+
+  function validateDrafts(selectedDrafts) {
+    const nextErrors = {}
+    selectedDrafts.forEach((draft) => {
+      const errorsForDraft = {}
+      if (!draft.name.trim()) errorsForDraft.name = 'Vui lòng nhập tên đội nhóm'
+      if (!draft.description.trim()) errorsForDraft.description = 'Vui lòng nhập mô tả đội nhóm'
+      if (Object.keys(errorsForDraft).length > 0) nextErrors[draft.id] = errorsForDraft
+    })
+    setDraftErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  async function handleCreateAiTeams() {
+    const selectedDrafts = aiTeamDrafts.filter((draft) => draft.selected)
+    if (selectedDrafts.length === 0) {
+      setErrors((current) => ({ ...current, aiDrafts: 'Vui lòng chọn ít nhất một đội nhóm AI' }))
+      return
+    }
+    if (!validateDrafts(selectedDrafts)) return
+
+    setIsSubmitting(true)
+    setSubscriptionGateError(null)
+    onError(null)
+    onSuccess(null)
+
+    try {
+      await Promise.all(
+        selectedDrafts.map((draft) =>
+          teamApi.create({
+            name: draft.name.trim(),
+            teamType: draft.teamType || 'OPERATIONS',
+            description: draft.description.trim(),
+            status: draft.status || 'ACTIVE',
+            primaryScope: 'EVENT',
+            organizationId,
+            eventId,
+            addCreatorAsOwner: true,
+            initialMembers: [],
+          })
+        )
+      )
+      onSuccess(`Đã tạo ${selectedDrafts.length} đội nhóm từ AI`)
+      navigate(`/organizations/${organizationId}/events/${eventId}/teams`)
+    } catch (err) {
+      onError(getErrorMessage(err))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -173,6 +253,16 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
 
       <Card title="Thông tin đội nhóm">
         <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+            <FormField label="Ngữ cảnh cho AI">
+              <Textarea
+                value={aiContext}
+                onChange={(event) => setAiContext(event.target.value)}
+                rows={3}
+                placeholder="Ví dụ: sự kiện 500 khách VIP, cần tách đội đón tiếp và an ninh riêng, ngân sách hạn chế, ưu tiên tình nguyện viên..."
+              />
+            </FormField>
+          </div>
           <div className="flex justify-end">
             <Button type="button" variant="secondary" size="sm" loading={isSuggesting} leftIcon={<Sparkles size={16} />} onClick={handleSuggestTeam}>
               Gợi ý AI
@@ -257,6 +347,55 @@ function TeamCreateContent({ organizationId, eventId, onError, onSuccess }) {
           </div>
         </form>
       </Card>
+
+      {aiTeamDrafts.length > 0 ? (
+        <Card title={`Danh sách AI gợi ý (${aiTeamDrafts.length})`}>
+          <div className="space-y-3">
+            {errors.aiDrafts ? <p className="text-sm font-medium text-danger">{errors.aiDrafts}</p> : null}
+            {aiTeamDrafts.map((draft, index) => {
+              const currentErrors = draftErrors[draft.id] || {}
+              return (
+                <div key={draft.id} className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <label className="inline-flex items-center gap-2 text-sm font-semibold text-neutral-800">
+                      <input className="h-4 w-4 accent-primary" type="checkbox" checked={draft.selected} onChange={() => handleToggleDraft(draft.id)} />
+                      Đội #{index + 1}
+                    </label>
+                    <Button type="button" variant="ghost" size="sm" leftIcon={<Trash2 size={15} />} onClick={() => handleRemoveDraft(draft.id)}>
+                      Xóa
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <FormField label="Tên đội nhóm" required error={currentErrors.name}>
+                      <Input value={draft.name} onChange={(event) => handleDraftChange(draft.id, 'name', event.target.value)} error={currentErrors.name} />
+                    </FormField>
+                    <FormField label="Loại đội nhóm">
+                      <Input value={draft.teamType} onChange={(event) => handleDraftChange(draft.id, 'teamType', event.target.value)} />
+                    </FormField>
+                    <FormField label="Trạng thái">
+                      <Select value={draft.status} onChange={(event) => handleDraftChange(draft.id, 'status', event.target.value)}>
+                        {['ACTIVE', 'INACTIVE', 'PENDING', 'BANNED'].map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    <FormField label="Mô tả" required error={currentErrors.description}>
+                      <Textarea value={draft.description} onChange={(event) => handleDraftChange(draft.id, 'description', event.target.value)} error={currentErrors.description} rows={3} />
+                    </FormField>
+                  </div>
+                </div>
+              )
+            })}
+            <div className="flex justify-end">
+              <Button type="button" loading={isSubmitting} leftIcon={<CheckCircle2 size={16} />} onClick={handleCreateAiTeams}>
+                Tạo các đội đã chọn
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : null}
     </div>
   )
 }

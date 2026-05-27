@@ -11,11 +11,12 @@ function OrganizationEventsPage() {
 
   return (
     <OrganizationCaseLayout error={error} successMessage={successMessage} onError={setError}>
-      {() => (
+      {(_, context) => (
         <OrganizationEventsSection
           organizationId={Number(organizationId)}
           onError={setError}
           onSuccess={setSuccessMessage}
+          permissions={context.permissions}
         />
       )}
     </OrganizationCaseLayout>

@@ -32,6 +32,7 @@ function TeamCalendarCreateContent({ eventId, organizationId, teamId, defaultDat
   }))
   const [errors, setErrors] = useState({})
   const [drafts, setDrafts] = useState([])
+  const [aiContext, setAiContext] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
 
@@ -101,7 +102,7 @@ function TeamCalendarCreateContent({ eventId, organizationId, teamId, defaultDat
     onSuccess(null)
 
     try {
-      const response = await aiApi.suggestCalendar(eventId)
+      const response = await aiApi.suggestCalendar(eventId, { additionalContext: aiContext.trim() })
       const suggestions = getCalendarSuggestions(response.data)
 
       if (suggestions.length === 0) {
@@ -148,16 +149,18 @@ function TeamCalendarCreateContent({ eventId, organizationId, teamId, defaultDat
       <CalendarCreateForm
         form={form}
         errors={errors}
-      isSubmitting={isSubmitting}
-      isSuggesting={isSuggesting}
-      drafts={drafts}
-      onCancel={() => navigate(backPath)}
-      onChange={handleChange}
-      onSubmit={handleAddCurrentCalendarToDrafts}
-      onSuggest={handleSuggestCalendar}
-      onRemoveDraft={(draftId) => setDrafts((current) => current.filter((draft) => draft.id !== draftId))}
-      onCreateDrafts={handleCreateDrafts}
-    />
+        isSubmitting={isSubmitting}
+        isSuggesting={isSuggesting}
+        aiContext={aiContext}
+        drafts={drafts}
+        onCancel={() => navigate(backPath)}
+        onChange={handleChange}
+        onAiContextChange={(event) => setAiContext(event.target.value)}
+        onSubmit={handleAddCurrentCalendarToDrafts}
+        onSuggest={handleSuggestCalendar}
+        onRemoveDraft={(draftId) => setDrafts((current) => current.filter((draft) => draft.id !== draftId))}
+        onCreateDrafts={handleCreateDrafts}
+      />
     </Card>
   )
 }

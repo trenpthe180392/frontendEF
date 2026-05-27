@@ -130,7 +130,7 @@ function EventDashboardContent({ eventId, onError }) {
       {!isTeamLoading ? (
         <>
           <Card title={`Cập nhật công việc theo ngày - ${dashboardTitle}`}>
-            {lineData.length === 0 ? (
+            {lineData.length === 0 || updateCount === 0 ? (
               <EmptyState icon={<Activity size={24} />} title="Chưa có dữ liệu cập nhật" description="Khi công việc đổi trạng thái, biểu đồ sẽ cập nhật theo ngày." />
             ) : (
               <StatusLineChart data={lineData} />
@@ -158,7 +158,7 @@ function StatusLineChart({ data, compact = false }) {
       <div className="flex flex-wrap gap-3">
         {statusSeries.map((series) => (
           <div key={series.key} className="flex items-center gap-2 text-xs font-semibold text-neutral-600">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: 'var(--color-neutral-500)' }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: series.color }} />
             {series.label}
           </div>
         ))}
@@ -183,10 +183,7 @@ function StatusLineChart({ data, compact = false }) {
 
           {chart.lines.map((line) => (
             <g key={line.key}>
-              <polyline fill="none" stroke={line.color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" points={line.points} />
-              {line.nodes.map((node) => (
-                <circle key={`${line.key}-${node.x}-${node.y}`} cx={node.x} cy={node.y} r="3.5" fill={line.color} />
-              ))}
+              <path d={line.path} fill="none" stroke={line.color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" vectorEffect="non-scaling-stroke" />
             </g>
           ))}
 
@@ -265,13 +262,16 @@ function buildChart(data) {
       x: left + index * stepX,
       y: scaleY(item[series.key]),
     }))
+    const total = data.reduce((sum, item) => sum + Number(item[series.key] || 0), 0)
 
     return {
       ...series,
       nodes,
       points: nodes.map((node) => `${node.x},${node.y}`).join(' '),
+      path: nodes.map((node, index) => `${index === 0 ? 'M' : 'L'} ${node.x} ${node.y}`).join(' '),
+      total,
     }
-  })
+  }).filter((line) => line.total > 0)
 
   const yTicks = Array.from({ length: 6 }, (_, index) => {
     const value = Math.round((yMax / 5) * index)

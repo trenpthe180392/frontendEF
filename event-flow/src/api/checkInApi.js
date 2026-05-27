@@ -8,8 +8,8 @@ export const checkInApi = {
       return unwrapResponse(response)
     },
 
-    list: async (eventId) => {
-      const response = await apiClient.get(`/events/${eventId}/attendees`)
+    list: async (eventId, params = {}) => {
+      const response = await apiClient.get(`/events/${eventId}/attendees`, { params })
       return unwrapResponse(response)
     },
 
@@ -35,8 +35,8 @@ export const checkInApi = {
       return unwrapResponse(response)
     },
 
-    list: async (eventId) => {
-      const response = await apiClient.get(`/events/${eventId}/check-in-sessions`)
+    list: async (eventId, params = {}) => {
+      const response = await apiClient.get(`/events/${eventId}/check-in-sessions`, { params })
       return unwrapResponse(response)
     },
 
@@ -52,6 +52,16 @@ export const checkInApi = {
 
     delete: async (eventId, sessionId) => {
       const response = await apiClient.delete(`/events/${eventId}/check-in-sessions/${sessionId}`)
+      return unwrapResponse(response)
+    },
+
+    addAttendee: async (eventId, sessionId, payload) => {
+      const response = await apiClient.post(`/events/${eventId}/check-in-sessions/${sessionId}/attendees`, payload)
+      return unwrapResponse(response)
+    },
+
+    resendInviteEmail: async (eventId, sessionId, attendeeId) => {
+      const response = await apiClient.post(`/events/${eventId}/check-in-sessions/${sessionId}/attendees/${attendeeId}/invite-email`)
       return unwrapResponse(response)
     },
   },
@@ -74,8 +84,8 @@ export const checkInApi = {
   },
 
   records: {
-    listBySession: async (eventId, sessionId) => {
-      const response = await apiClient.get(`/events/${eventId}/check-in-sessions/${sessionId}/records`)
+    listBySession: async (eventId, sessionId, params = {}) => {
+      const response = await apiClient.get(`/events/${eventId}/check-in-sessions/${sessionId}/records`, { params })
       return unwrapResponse(response)
     },
   },

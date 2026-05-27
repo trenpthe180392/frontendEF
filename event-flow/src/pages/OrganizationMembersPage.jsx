@@ -11,11 +11,13 @@ function OrganizationMembersPage() {
 
   return (
     <OrganizationCaseLayout error={error} successMessage={successMessage} onError={setError}>
-      {() => (
+      {(_, context) => (
         <OrganizationMembersSection
           organizationId={Number(organizationId)}
+          currentMembership={context.currentMembership}
           onError={setError}
           onSuccess={setSuccessMessage}
+          permissions={context.permissions}
         />
       )}
     </OrganizationCaseLayout>

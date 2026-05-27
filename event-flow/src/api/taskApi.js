@@ -3,6 +3,7 @@ import apiClient from './client'
 export const taskApi = {
   getById: (taskId) => apiClient.get(`/tasks/${taskId}`),
   getByEvent: (eventId, params) => apiClient.get(`/tasks/event/${eventId}`, { params }),
+  getAssignedByEvent: (eventId, params) => apiClient.get(`/tasks/event/${eventId}/assigned-to-me`, { params }),
   getByTeam: (teamId, params) => apiClient.get(`/tasks/team/${teamId}`, { params }),
   getSubtasks: (taskId) => apiClient.get(`/tasks/${taskId}/subtasks`),
   create: (data) => apiClient.post('/tasks', data),

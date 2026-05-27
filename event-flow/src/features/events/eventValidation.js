@@ -4,8 +4,6 @@ export function validateEventForm(form, now = new Date()) {
   const errors = {}
   const start = normalizeWallTime(form.startTime)
   const end = normalizeWallTime(form.endTime)
-  const registrationStart = normalizeWallTime(form.registrationStart)
-  const registrationDeadline = normalizeWallTime(form.registrationDeadline)
   const businessNow = toBusinessWallTime(now)
 
   if (!form.name.trim()) errors.name = 'Vui lòng nhập tên sự kiện.'
@@ -18,16 +16,6 @@ export function validateEventForm(form, now = new Date()) {
   }
   if (end && start && end <= start) {
     errors.endTime = 'Thời gian kết thúc phải sau thời gian bắt đầu.'
-  }
-  if (registrationDeadline && registrationDeadline <= businessNow) {
-    errors.registrationDeadline = 'Hạn đăng ký đã qua. Vui lòng chọn thời gian trong tương lai.'
-  }
-  if (registrationDeadline && start && registrationDeadline >= start) {
-    errors.registrationDeadline = 'Hạn đăng ký phải trước thời gian bắt đầu sự kiện.'
-  }
-  if (registrationStart && registrationDeadline && registrationStart >= registrationDeadline) {
-    errors.registrationStart = 'Thời gian mở đăng ký phải trước hạn đăng ký.'
-    errors.registrationDeadline = 'Hạn đăng ký phải sau thời gian mở đăng ký.'
   }
   if (form.capacity && Number(form.capacity) < 1) errors.capacity = 'Sức chứa tối thiểu là 1.'
   if (form.estimatedBudget && Number(form.estimatedBudget) < 0) {

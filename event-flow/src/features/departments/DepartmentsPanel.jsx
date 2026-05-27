@@ -24,6 +24,7 @@ const departmentRoleLabels = departmentRoleOptions.reduce((labels, role) => {
 })
 
 function DepartmentsPanel({
+  canManageDepartments = false,
   departmentForm,
   departmentErrors,
   departments,
@@ -52,7 +53,7 @@ function DepartmentsPanel({
     <Card
       title="Phòng ban"
       headerRight={
-        selectedDepartment ? null : (
+        selectedDepartment || !canManageDepartments ? null : (
           <Button
             type="button"
             variant={isDepartmentCreateOpen ? 'secondary' : 'primary'}
@@ -65,7 +66,7 @@ function DepartmentsPanel({
         )
       }
     >
-      {isDepartmentCreateOpen ? (
+      {canManageDepartments && isDepartmentCreateOpen ? (
         <form className="mb-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4" onSubmit={onCreateDepartment}>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <FormField label="Tên phòng ban" required error={departmentErrors.name}>
@@ -163,47 +164,49 @@ function DepartmentsPanel({
             </div>
           </div>
 
-          <form className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_180px_auto]" onSubmit={onAddDepartmentMember}>
-            <FormField label="Thành viên tổ chức" required error={departmentMemberErrors.userId}>
-              <Select
-                name="userId"
-                value={departmentMemberForm.userId}
-                onChange={onDepartmentMemberChange}
-                error={departmentMemberErrors.userId}
-              >
-                <option value="">Chọn thành viên</option>
-                {members.map((member) => (
-                  <option key={member.userId} value={member.userId}>
-                    {member.userName} - Mã {member.userId}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="Vai trò" required error={departmentMemberErrors.role}>
-              <Select
-                name="role"
-                value={departmentMemberForm.role}
-                onChange={onDepartmentMemberChange}
-                error={departmentMemberErrors.role}
-              >
-                {departmentRoleOptions.map((role) => (
-                  <option key={role.value} value={role.value}>
-                    {role.label} ({role.value})
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-            <div className="flex items-end">
-              <Button
-                type="submit"
-                leftIcon={<UserPlus size={16} />}
-                loading={isDepartmentMemberSubmitting}
-                disabled={isDepartmentMemberSubmitting}
-              >
-                Thêm thành viên
-              </Button>
-            </div>
-          </form>
+          {canManageDepartments ? (
+            <form className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_180px_auto]" onSubmit={onAddDepartmentMember}>
+              <FormField label="Thành viên tổ chức" required error={departmentMemberErrors.userId}>
+                <Select
+                  name="userId"
+                  value={departmentMemberForm.userId}
+                  onChange={onDepartmentMemberChange}
+                  error={departmentMemberErrors.userId}
+                >
+                  <option value="">Chọn thành viên</option>
+                  {members.map((member) => (
+                    <option key={member.userId} value={member.userId}>
+                      {member.userName} - Mã {member.userId}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Vai trò" required error={departmentMemberErrors.role}>
+                <Select
+                  name="role"
+                  value={departmentMemberForm.role}
+                  onChange={onDepartmentMemberChange}
+                  error={departmentMemberErrors.role}
+                >
+                  {departmentRoleOptions.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label} ({role.value})
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <div className="flex items-end">
+                <Button
+                  type="submit"
+                  leftIcon={<UserPlus size={16} />}
+                  loading={isDepartmentMemberSubmitting}
+                  disabled={isDepartmentMemberSubmitting}
+                >
+                  Thêm thành viên
+                </Button>
+              </div>
+            </form>
+          ) : null}
 
           {departmentMembers.length === 0 ? (
             <EmptyState
@@ -220,7 +223,7 @@ function DepartmentsPanel({
                     <th className="px-4 py-3">Vai trò</th>
                     <th className="px-4 py-3">Trạng thái</th>
                     <th className="px-4 py-3">Ngày tham gia</th>
-                    <th className="px-4 py-3 text-right">Thao tác</th>
+                    {canManageDepartments ? <th className="px-4 py-3 text-right">Thao tác</th> : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 bg-white">
@@ -235,21 +238,23 @@ function DepartmentsPanel({
                         <Badge variant={departmentStatusVariant[member.status] || 'default'}>{member.status}</Badge>
                       </td>
                       <td className="px-4 py-3 text-neutral-700">{formatDateTime(member.joinedAt)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          leftIcon={<Trash2 size={16} />}
-                          loading={
-                            removingDepartmentMember?.departmentId === member.departmentId &&
-                            removingDepartmentMember?.userId === member.userId
-                          }
-                          onClick={() => onRemoveDepartmentMember(member)}
-                        >
-                          Xóa
-                        </Button>
-                      </td>
+                      {canManageDepartments ? (
+                        <td className="px-4 py-3 text-right">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            leftIcon={<Trash2 size={16} />}
+                            loading={
+                              removingDepartmentMember?.departmentId === member.departmentId &&
+                              removingDepartmentMember?.userId === member.userId
+                            }
+                            onClick={() => onRemoveDepartmentMember(member)}
+                          >
+                            Xóa
+                          </Button>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>

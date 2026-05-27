@@ -7,12 +7,19 @@ import { getErrorMessage, getFieldErrors } from '../../utils'
 import { formatDateTime } from '../../utils/dateFormat'
 import useAutoReload from '../../hooks/useAutoReload'
 import { normalizeOrganizationEvent } from '../../utils/organizationMappers'
+import { getOrganizationEventPolicy, getOrganizationPermissions } from '../organizations/organizationPermissions'
 import { defaultEventForm } from './eventConstants'
 import { createEventFormFromEvent, toEventPayload } from './eventMappers'
 import { validateEventForm as getEventFormErrors } from './eventValidation'
 import EventsPanel from './EventsPanel'
 
-function OrganizationEventsSection({ organizationId, onError, onSuccess, onCountChange }) {
+function OrganizationEventsSection({
+  organizationId,
+  onError,
+  onSuccess,
+  onCountChange,
+  permissions = getOrganizationPermissions('MEMBER'),
+}) {
   const navigate = useNavigate()
   const [events, setEvents] = useState([])
   const [eventForm, setEventForm] = useState(defaultEventForm)
@@ -23,6 +30,7 @@ function OrganizationEventsSection({ organizationId, onError, onSuccess, onCount
   const [eventActionId, setEventActionId] = useState(null)
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState(null)
   const [pendingCancelEvent, setPendingCancelEvent] = useState(null)
+  const eventPolicy = getOrganizationEventPolicy(permissions)
 
   useEffect(() => {
     handleReloadEvents()
@@ -145,6 +153,7 @@ function OrganizationEventsSection({ organizationId, onError, onSuccess, onCount
 
   return (
     <EventsPanel
+      canManageEvents={eventPolicy.canManageEvents}
       events={events}
       eventForm={eventForm}
       eventErrors={eventErrors}

@@ -53,6 +53,7 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
   const [members, setMembers] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [drafts, setDrafts] = useState([])
+  const [aiContext, setAiContext] = useState('')
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
@@ -195,7 +196,7 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
     onSuccess(null)
 
     try {
-      const response = await aiApi.suggestTasks(eventId)
+      const response = await aiApi.suggestTasks(eventId, { additionalContext: aiContext.trim() })
       const suggestions = (response.data?.tasks || []).filter(isSuggestionForCurrentTeam)
       if (suggestions.length === 0) {
         onSuccess('AI chưa trả về công việc gợi ý cho đội nhóm này')
@@ -337,6 +338,16 @@ function TeamTasksContent({ eventDetail, organizationId, eventId, teamId, onErro
                   Thêm công việc
                 </Button>
               </div>
+            </div>
+            <div className="mb-4 rounded-lg border border-neutral-200 bg-white p-3">
+              <FormField label="Ngữ cảnh cho AI">
+                <Textarea
+                  value={aiContext}
+                  onChange={(event) => setAiContext(event.target.value)}
+                  rows={3}
+                  placeholder="Ví dụ: chỉ tạo task trong phạm vi đội này, ưu tiên checklist bàn giao, có ca trực sáng/chiều, cần nêu rõ tiêu chuẩn nghiệm thu..."
+                />
+              </FormField>
             </div>
             {errors.batch ? <p className="mb-3 text-sm font-medium text-danger">{errors.batch}</p> : null}
             <div className="rounded-lg border border-neutral-200 bg-white p-3">

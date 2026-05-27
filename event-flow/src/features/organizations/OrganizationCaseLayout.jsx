@@ -1,24 +1,26 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, AlertTriangle, BarChart3, Building2, CalendarDays, ClipboardList, CreditCard, GitBranch, Image, LayoutDashboard, Mail, Megaphone, ScanLine, TicketCheck, Users, Wallet } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, BarChart3, Building2, CalendarDays, ClipboardCheck, ClipboardList, CreditCard, GitBranch, Image, LayoutDashboard, Mail, Megaphone, ScanLine, Users, Wallet } from 'lucide-react'
 import { NavLink, useNavigate, useParams } from 'react-router-dom'
 
-import { eventApi, organizationApi } from '../../api'
+import { eventApi, organizationApi, organizationMemberApi } from '../../api'
 import AlertBanner from '../../components/feedback/AlertBanner'
 import Card from '../../components/layout/Card'
 import PageHeader from '../../components/layout/PageHeader'
 import Button from '../../components/ui/Button'
 import Spinner from '../../components/ui/Spinner'
+import useAuthStore from '../../store/authStore'
 import { getErrorMessage } from '../../utils'
-import { normalizeOrganization } from '../../utils/organizationMappers'
+import { normalizeOrganization, normalizeOrganizationMember } from '../../utils/organizationMappers'
 import { getOrganizationImage } from './organizationConstants'
+import { filterOrganizationRoutes, getOrganizationPermissions } from './organizationPermissions'
 
 const organizationRoutes = [
   { to: '', label: 'Thông tin', icon: Building2, end: true },
-  { to: 'members', label: 'Thành viên', icon: Users },
-  { to: 'departments', label: 'Phòng ban', icon: GitBranch },
-  { to: 'events', label: 'Sự kiện', icon: CalendarDays },
-  { to: 'branding', label: 'Branding', icon: Image },
-  { to: 'subscription', label: 'Billing', icon: CreditCard },
+  { to: 'members', label: 'Thành viên', icon: Users, permission: 'organization.members.view' },
+  { to: 'departments', label: 'Phòng ban', icon: GitBranch, permission: 'organization.departments.view' },
+  { to: 'events', label: 'Sự kiện', icon: CalendarDays, permission: 'organization.events.view' },
+  { to: 'branding', label: 'Branding', icon: Image, permission: 'organization.branding.view' },
+  { to: 'subscription', label: 'Billing', icon: CreditCard, permission: 'organization.subscription.view' },
 ]
 
 const eventRoutes = [
@@ -27,13 +29,13 @@ const eventRoutes = [
   { to: 'finance', module: 'finance', label: 'Tài chính', icon: Wallet },
   { to: 'landing-page', module: 'landing-page', label: 'Landing page', icon: Megaphone },
   { to: 'email-campaigns', module: 'email-campaigns', label: 'Email', icon: Mail },
-  { to: 'check-in/attendees', module: 'check-in', label: 'Người tham dự', icon: TicketCheck },
-  { to: 'check-in/sessions', module: 'check-in', label: 'Phiên check-in', icon: ScanLine },
+  { to: 'check-in', module: 'check-in', label: 'Check-in', icon: ScanLine },
   { to: 'calendar', module: 'calendar', label: 'Lịch', icon: CalendarDays },
   { to: 'issues', module: 'issues', label: 'Issues', icon: AlertTriangle },
   { to: 'members', module: 'members', label: 'Thành viên', icon: Users },
   { to: 'teams', module: 'teams', label: 'Đội nhóm', icon: BarChart3 },
-  { to: 'tasks', module: 'tasks', label: 'Công việc', icon: ClipboardList },
+  { to: 'tasks', module: 'tasks', label: 'Công việc', icon: ClipboardList, requiredAction: 'TASK_MANAGE' },
+  { to: 'assigned-tasks', module: 'tasks', label: 'Việc của tôi', icon: ClipboardCheck, hiddenWhenAction: 'TASK_MANAGE' },
 ]
 
 const teamRoutes = [
@@ -47,9 +49,12 @@ const teamRoutes = [
 function OrganizationCaseLayout({ children, error, successMessage, onError }) {
   const { organizationId, eventId, teamId } = useParams()
   const navigate = useNavigate()
+  const { user, token } = useAuthStore()
   const [organization, setOrganization] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [accessContext, setAccessContext] = useState(null)
+  const [currentMembership, setCurrentMembership] = useState(null)
+  const currentUserId = getCurrentUserId(user, token)
 
   const loadOrganization = useCallback(async () => {
     setIsLoading(true)
@@ -58,6 +63,15 @@ function OrganizationCaseLayout({ children, error, successMessage, onError }) {
     try {
       const response = await organizationApi.getById(organizationId)
       setOrganization(normalizeOrganization(response.data))
+
+      if (currentUserId) {
+        const memberResponse = await organizationMemberApi.getByOrganization(organizationId, { page: 0, size: 1000 })
+        const members = normalizeMemberList(memberResponse.data)
+        setCurrentMembership(members.find((member) => Number(member.userId) === Number(currentUserId)) || null)
+      } else {
+        setCurrentMembership(null)
+      }
+
       if (eventId) {
         const accessResponse = await eventApi.getAccessContext(eventId)
         setAccessContext(accessResponse.data)
@@ -69,11 +83,19 @@ function OrganizationCaseLayout({ children, error, successMessage, onError }) {
     } finally {
       setIsLoading(false)
     }
-  }, [eventId, organizationId, onError])
+  }, [currentUserId, eventId, organizationId, onError])
 
   useEffect(() => {
     loadOrganization()
   }, [loadOrganization])
+
+  const permissions = getOrganizationPermissions(currentMembership?.role)
+  const visibleOrganizationRoutes = filterOrganizationRoutes(organizationRoutes, permissions)
+  const layoutContext = {
+    accessContext,
+    currentMembership,
+    permissions,
+  }
 
   return (
     <main className="min-h-[calc(100vh-129px)] bg-neutral-100 p-6 text-neutral-700">
@@ -124,14 +146,14 @@ function OrganizationCaseLayout({ children, error, successMessage, onError }) {
               <div className="p-3">
               <SidebarSection
                 title="Workspace"
-                routes={organizationRoutes}
+                routes={visibleOrganizationRoutes}
                 basePath={`/organizations/${organization.id}`}
               />
 
               {eventId ? (
                 <SidebarSection
                   title="Sự kiện"
-                  routes={eventRoutes.filter((route) => !accessContext || accessContext.allowedModules?.includes(route.module))}
+                  routes={filterEventRoutes(eventRoutes, accessContext)}
                   basePath={`/organizations/${organization.id}/events/${eventId}`}
                 />
               ) : null}
@@ -146,12 +168,45 @@ function OrganizationCaseLayout({ children, error, successMessage, onError }) {
               </div>
             </aside>
 
-            <div className="min-w-0 space-y-4">{children(organization)}</div>
+            <div className="min-w-0 space-y-4">{children(organization, layoutContext)}</div>
           </div>
         ) : null}
       </div>
     </main>
   )
+}
+
+function normalizeMemberList(responseData) {
+  const content = Array.isArray(responseData) ? responseData : responseData?.content || []
+  return content.map(normalizeOrganizationMember)
+}
+
+function filterEventRoutes(routes, accessContext) {
+  return routes.filter((route) => {
+    if (accessContext && !accessContext.allowedModules?.includes(route.module)) return false
+    if (route.requiredAction && !accessContext?.allowedActions?.includes(route.requiredAction)) return false
+    if (route.hiddenWhenAction && accessContext?.allowedActions?.includes(route.hiddenWhenAction)) return false
+    return true
+  })
+}
+
+function getCurrentUserId(user, token) {
+  const tokenPayload = decodeJwtPayload(token)
+  const userId = user?.id || user?.userId || user?.uid || tokenPayload?.uid || tokenPayload?.userId || tokenPayload?.id
+  return userId ? Number(userId) : null
+}
+
+function decodeJwtPayload(token) {
+  if (!token) return null
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    return JSON.parse(window.atob(padded))
+  } catch {
+    return null
+  }
 }
 
 function SidebarSection({ title, routes, basePath }) {

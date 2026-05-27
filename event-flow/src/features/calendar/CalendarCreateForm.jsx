@@ -14,9 +14,11 @@ function CalendarCreateForm({
   errors,
   isSubmitting,
   isSuggesting,
+  aiContext = '',
   drafts = [],
   onCancel,
   onChange,
+  onAiContextChange,
   onSubmit,
   onSuggest,
   onRemoveDraft,
@@ -32,6 +34,16 @@ function CalendarCreateForm({
           Thêm lịch
         </Button>
       </div>
+      <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+        <FormField label="Ngữ cảnh cho AI">
+          <Textarea
+            value={aiContext}
+            onChange={onAiContextChange}
+            rows={3}
+            placeholder="Ví dụ: cần lịch rehearsal trước giờ mở cửa, có vendor cần phối hợp, ưu tiên checkpoint giữa các đội và mốc bàn giao rõ ràng..."
+          />
+        </FormField>
+      </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <section className="rounded-lg border border-neutral-200 bg-white p-4">

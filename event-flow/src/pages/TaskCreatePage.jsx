@@ -38,6 +38,7 @@ function TaskCreateContent({ eventDetail, organizationId, eventId, teamId = null
   const [members, setMembers] = useState([])
   const [form, setForm] = useState(teamId ? { ...emptyTaskForm, teamId: String(teamId) } : emptyTaskForm)
   const [drafts, setDrafts] = useState([])
+  const [aiContext, setAiContext] = useState('')
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
@@ -248,7 +249,7 @@ function TaskCreateContent({ eventDetail, organizationId, eventId, teamId = null
 
     try {
       if (parentTaskId) {
-        const response = await aiApi.createSubtasksFromParent(parentTaskId, { maxSubTasks: 5 })
+        const response = await aiApi.createSubtasksFromParent(parentTaskId, { maxSubTasks: 5, additionalContext: aiContext.trim() })
         const createdCount = response.data?.createdCount ?? response.data?.tasks?.length ?? 0
         if (createdCount === 0) {
           onSuccess('AI chưa tạo thêm công việc con mới cho công việc cha này')
@@ -261,7 +262,7 @@ function TaskCreateContent({ eventDetail, organizationId, eventId, teamId = null
         return
       }
 
-      const response = await aiApi.suggestTasks(eventId)
+      const response = await aiApi.suggestTasks(eventId, { additionalContext: aiContext.trim() })
       const suggestions = response.data?.tasks || []
       const scopedSuggestions = teamId
         ? suggestions.filter((task) => {
@@ -360,6 +361,18 @@ function TaskCreateContent({ eventDetail, organizationId, eventId, teamId = null
               Task tạo tại đây là công việc vận hành. Để tạo task có phân bổ ngân sách, bắt đầu tại trang Tài chính sự kiện.
             </div>
           )}
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+            <FormField label={isSubtaskCreate ? 'Ngữ cảnh cho AI tạo task con' : 'Ngữ cảnh cho AI'}>
+              <Textarea
+                value={aiContext}
+                onChange={(event) => setAiContext(event.target.value)}
+                rows={3}
+                placeholder={isSubtaskCreate
+                  ? 'Ví dụ: chia task cha thành các bước kiểm tra nhà cung cấp, duyệt báo giá, tạm ứng, nghiệm thu và lưu chứng từ...'
+                  : 'Ví dụ: ưu tiên task có đầu ra rõ, phân theo đội hiện có, tránh tạo việc chuẩn bị đã xong, tập trung khâu vận hành tại hiện trường...'}
+              />
+            </FormField>
+          </div>
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="secondary" size="sm" loading={isSuggesting} disabled={!canCreate} leftIcon={<Sparkles size={16} />} onClick={handleSuggestTask}>
               {isSubtaskCreate ? 'Tạo task con bằng AI' : 'Gợi ý AI'}

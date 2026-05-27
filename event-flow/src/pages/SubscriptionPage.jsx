@@ -33,8 +33,12 @@ import Textarea from '../components/ui/Textarea'
 import ConfirmDialog from '../components/feedback/ConfirmDialog'
 import SubscriptionCheckoutForm from '../features/subscriptions/SubscriptionCheckoutForm'
 import { organizationTypes } from '../features/organizations/organizationConstants'
+import {
+  getOrganizationPermissions,
+  getOrganizationSubscriptionPolicy,
+} from '../features/organizations/organizationPermissions'
 import { subscriptionApi } from '../api/subscriptionApi'
-import { organizationApi } from '../api'
+import { organizationApi, organizationMemberApi } from '../api'
 import { getTokenUserId } from '../services/tokenService'
 import { unwrapData } from '../api/response'
 import { getErrorMessage, getFieldErrors } from '../utils/apiError'
@@ -82,6 +86,19 @@ function SubscriptionPage() {
   const isRenewableSubscription = activeSub?.status === 'ACTIVE' && ['MONTHLY', 'YEARLY'].includes(activeSub?.billingCycle)
   const hasSubscriptionGateError = isSubscriptionGateError(errorDetail)
 
+  const resolveWorkspaceBillingAccess = useCallback(async (workspaceId) => {
+    const currentUserId = getTokenUserId()
+    if (!currentUserId) {
+      return false
+    }
+
+    const response = await organizationMemberApi.getByOrganization(workspaceId, { page: 0, size: 1000 })
+    const members = Array.isArray(response.data) ? response.data : response.data?.content || []
+    const currentMembership = members.find((member) => Number(member.userId) === Number(currentUserId))
+    const nextPermissions = getOrganizationPermissions(currentMembership?.role)
+    return getOrganizationSubscriptionPolicy(nextPermissions).canManageSubscription
+  }, [])
+
   const fetchData = useCallback(async () => {
     if (!organizationId) return
 
@@ -89,6 +106,12 @@ function SubscriptionPage() {
     setError(null)
     setErrorDetail(null)
     try {
+      const canManageBilling = await resolveWorkspaceBillingAccess(organizationId)
+      if (!canManageBilling) {
+        navigate(`/organizations/${organizationId}`, { replace: true })
+        return
+      }
+
       const [plansResult, subResult, historyResult] = await Promise.allSettled([
         subscriptionApi.getPlans(),
         subscriptionApi.getActiveSubscription(organizationId),
@@ -122,7 +145,7 @@ function SubscriptionPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [organizationId])
+  }, [navigate, organizationId, resolveWorkspaceBillingAccess])
 
   useEffect(() => {
     if (organizationId) return

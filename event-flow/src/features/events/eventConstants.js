@@ -5,8 +5,6 @@ export const defaultEventForm = {
   location: '',
   startTime: '',
   endTime: '',
-  registrationStart: '',
-  registrationDeadline: '',
   capacity: '',
   estimatedBudget: '',
   visible: true,

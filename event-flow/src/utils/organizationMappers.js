@@ -64,8 +64,6 @@ export function normalizeOrganizationEvent(event) {
     location: event.location || '',
     startTime: event.startTime,
     endTime: event.endTime,
-    registrationStart: event.registrationStart,
-    registrationDeadline: event.registrationDeadline,
     capacity: event.capacity,
     estimatedBudget: event.estimatedBudget,
     approvedBudget: event.approvedBudget,

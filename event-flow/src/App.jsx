@@ -5,8 +5,8 @@ import AboutPage from './pages/AboutPage'
 import DepartmentCreatePage from './pages/DepartmentCreatePage'
 import EventCalendarCreatePage from './pages/EventCalendarCreatePage'
 import EventCalendarPage from './pages/EventCalendarPage'
-import EventCheckInAttendeesPage from './pages/EventCheckInAttendeesPage'
-import EventCheckInScannerPage from './pages/EventCheckInScannerPage'
+import EventCheckInRunnerPage from './pages/EventCheckInRunnerPage'
+import EventCheckInSessionDetailPage from './pages/EventCheckInSessionDetailPage'
 import EventCheckInSessionsPage from './pages/EventCheckInSessionsPage'
 import EventCreatePage from './pages/EventCreatePage'
 import EventDashboardPage from './pages/EventDashboardPage'
@@ -15,6 +15,7 @@ import EmailCampaignsPage from './pages/EmailCampaignsPage'
 import EventInfoPage from './pages/EventInfoPage'
 import EventLandingPageEditorPage from './pages/EventLandingPageEditorPage'
 import EventMembersPage from './pages/EventMembersPage'
+import EventAssignedTasksPage from './pages/EventAssignedTasksPage'
 import EventTasksPage from './pages/EventTasksPage'
 import EventTeamsPage from './pages/EventTeamsPage'
 import { EventIssuesPage, TeamIssuesPage } from './pages/IssueListPage'
@@ -85,9 +86,12 @@ function App() {
             <Route path="/organizations/:organizationId/events/:eventId/finance" element={<EventFinanceDashboardPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/email-campaigns" element={<EmailCampaignsPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/landing-page" element={<EventLandingPageEditorPage />} />
-            <Route path="/organizations/:organizationId/events/:eventId/check-in/attendees" element={<EventCheckInAttendeesPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/check-in" element={<EventCheckInSessionsPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/check-in/attendees" element={<EventCheckInSessionsPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/check-in/sessions" element={<EventCheckInSessionsPage />} />
-            <Route path="/organizations/:organizationId/events/:eventId/check-in/scanner" element={<EventCheckInScannerPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/check-in/sessions/:sessionId/check-in" element={<EventCheckInRunnerPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/check-in/sessions/:sessionId" element={<EventCheckInSessionDetailPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/check-in/scanner" element={<EventCheckInSessionsPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/calendar/create" element={<EventCalendarCreatePage />} />
             <Route path="/organizations/:organizationId/events/:eventId/calendar" element={<EventCalendarPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/issues" element={<EventIssuesPage />} />
@@ -107,6 +111,7 @@ function App() {
             <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/tasks/:taskId/edit" element={<TaskEditPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/tasks/:taskId/feedback" element={<TaskFeedbackPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/teams/:teamId/tasks/:taskId" element={<TaskDetailPage />} />
+            <Route path="/organizations/:organizationId/events/:eventId/assigned-tasks" element={<EventAssignedTasksPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/tasks" element={<EventTasksPage />} />
             <Route path="/organizations/:organizationId/events/:eventId/tasks/create" element={<TaskCreatePage />} />
             <Route path="/organizations/:organizationId/events/:eventId/tasks/:taskId/edit" element={<TaskEditPage />} />
