@@ -86,6 +86,7 @@ const statusVariants = {
 }
 
 const actionConfig = {
+  uploadAttachment: { label: 'Upload chứng từ', icon: Upload },
   submit: { label: 'Gửi duyệt', icon: Send },
   approve: { label: 'Phê duyệt', icon: CheckCircle2 },
   reject: { label: 'Từ chối', icon: XCircle },
@@ -95,6 +96,38 @@ const actionConfig = {
   escalate: { label: 'Chuyển cấp', icon: Upload },
   cancel: { label: 'Hủy', icon: Ban },
 }
+
+const financeViews = [
+  {
+    key: 'mine',
+    title: 'My Expense Requests',
+    eyebrow: 'Requester-only',
+    description: 'Chỉ các yêu cầu do bạn tạo trong sự kiện này.',
+    emptyTitle: 'Không có request',
+    emptyDescription: 'Các nháp, yêu cầu cần bổ sung và yêu cầu đã gửi của bạn sẽ hiển thị ở đây.',
+    scope: 'mine',
+  },
+  {
+    key: 'team-review',
+    title: 'Team Review Queue',
+    eyebrow: 'Team-scoped',
+    description: 'Hàng đợi review của Team Lead theo phạm vi task/team được backend cấp quyền.',
+    emptyTitle: 'Không có yêu cầu cần team review',
+    emptyDescription: 'Các request thường ở trạng thái đã gửi sẽ xuất hiện khi bạn là reviewer hợp lệ.',
+    status: 'SUBMITTED',
+    predicate: (request) => request.status === 'SUBMITTED' && !isEventEscalationRequest(request),
+  },
+  {
+    key: 'event-escalation',
+    title: 'Event Escalation Inbox',
+    eyebrow: 'Event escalation',
+    description: 'Yêu cầu bổ sung ngân sách hoặc điều chuyển liên hạng mục cần Event Lead xử lý.',
+    emptyTitle: 'Không có escalation',
+    emptyDescription: 'Các request thuộc Event Escalation lane sẽ xuất hiện ở đây.',
+    status: 'SUBMITTED,ESCALATED',
+    predicate: isEventEscalationRequest,
+  },
+]
 
 const createDefaults = {
   majorTaskId: '',
@@ -146,6 +179,10 @@ function normalizeSubtask(task) {
 }
 
 function normalizeExpenseRequest(request) {
+  const budgetSnapshot = request?.budgetSnapshot || null
+  const subtask = budgetSnapshot?.subtask
+  const majorTask = budgetSnapshot?.majorTask
+
   return {
     id: request?.id,
     endpointId: getLongIdFromUuid(request?.id),
@@ -166,9 +203,15 @@ function normalizeExpenseRequest(request) {
     sourceTaskBudget: request?.sourceTaskBudget,
     targetTaskBudget: request?.targetTaskBudget,
     paymentId: getLongIdFromUuid(request?.paymentId),
-    allowedActions: Array.isArray(request?.allowedActions) ? request.allowedActions : null,
+    allowedActions: Array.isArray(request?.allowedActions) ? request.allowedActions : [],
     reviewLane: request?.reviewLane,
     nextReviewerLabel: request?.nextReviewerLabel,
+    reviewerIdentity: request?.reviewerIdentity || null,
+    deniedReason: request?.deniedReason || '',
+    editableAttachment: request?.editableAttachment === true,
+    budgetSnapshot,
+    subtaskName: subtask?.taskName,
+    majorTaskName: majorTask?.taskName,
     createdAt: request?.createdAt,
     updatedAt: request?.updatedAt,
     versions: normalizeArray(request?.versions),
@@ -176,14 +219,24 @@ function normalizeExpenseRequest(request) {
   }
 }
 
-function getAvailableActions(status) {
-  if (status === 'DRAFT') return ['submit', 'cancel']
-  if (status === 'SUBMITTED') return ['approve', 'reject', 'needMoreInfo', 'escalate', 'cancel']
-  if (status === 'NEED_MORE_INFO') return ['resubmit', 'cancel']
-  if (status === 'ESCALATED') return ['approve', 'reject']
-  if (status === 'APPROVED') return ['commit', 'cancel']
-  if (status === 'COMMITTED' || status === 'PARTIALLY_PAID') return ['cancel']
-  return []
+function isEventEscalationRequest(request) {
+  return ['ADDITIONAL_BUDGET', 'REALLOCATION_ESCALATE'].includes(request?.requestType)
+    || request?.reviewLane === 'EVENT_LEAD'
+    || request?.status === 'ESCALATED'
+}
+
+function getActionableButtons(request) {
+  return (request?.allowedActions || []).filter((action) => action !== 'uploadAttachment')
+}
+
+function getActionSummary(request) {
+  const actions = getActionableButtons(request)
+  if (actions.length === 0) return 'Không có thao tác'
+  return actions.map((action) => actionConfig[action]?.label || action).join(', ')
+}
+
+function getTaskContext(request) {
+  return request?.subtaskName || request?.sourceTaskName || request?.majorTaskName || 'Chưa có task context'
 }
 
 function getActionDefaults(action, request) {
@@ -261,6 +314,7 @@ function validateAttachment(file) {
 
 function ExpenseRequestWorkspace({ eventId, majorTasks = [], onDashboardRefresh, onError, onSuccess }) {
   const [requests, setRequests] = useState([])
+  const [activeView, setActiveView] = useState('mine')
   const [filters, setFilters] = useState({ status: '', majorTaskId: '' })
   const [createForm, setCreateForm] = useState(createDefaults)
   const [createErrors, setCreateErrors] = useState({})
@@ -275,6 +329,11 @@ function ExpenseRequestWorkspace({ eventId, majorTasks = [], onDashboardRefresh,
   const [totalElements, setTotalElements] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
 
+  const activeViewDef = useMemo(
+    () => financeViews.find((view) => view.key === activeView) || financeViews[0],
+    [activeView],
+  )
+
   const loadRequests = useCallback(async () => {
     setIsLoading(true)
     onError(null)
@@ -282,8 +341,9 @@ function ExpenseRequestWorkspace({ eventId, majorTasks = [], onDashboardRefresh,
     try {
       const response = await financeApi.expenseRequests.list({
         eventId,
-        status: filters.status || undefined,
+        status: filters.status || activeViewDef.status || undefined,
         majorTaskId: filters.majorTaskId || undefined,
+        scope: activeViewDef.scope,
         page: currentPage - 1,
         size: pageSize,
       })
@@ -298,7 +358,7 @@ function ExpenseRequestWorkspace({ eventId, majorTasks = [], onDashboardRefresh,
     } finally {
       setIsLoading(false)
     }
-  }, [currentPage, eventId, filters.majorTaskId, filters.status, onError, pageSize])
+  }, [activeViewDef.scope, activeViewDef.status, currentPage, eventId, filters.majorTaskId, filters.status, onError, pageSize])
 
   const loadSubtasks = useCallback(async (majorTaskId) => {
     if (!majorTaskId) {
@@ -331,6 +391,12 @@ function ExpenseRequestWorkspace({ eventId, majorTasks = [], onDashboardRefresh,
   function handleFilterChange(event) {
     const { name, value } = event.target
     setFilters((current) => ({ ...current, [name]: value }))
+    setCurrentPage(1)
+  }
+
+  function handleViewChange(nextView) {
+    setActiveView(nextView)
+    setFilters({ status: '', majorTaskId: '' })
     setCurrentPage(1)
   }
 
@@ -420,13 +486,18 @@ function ExpenseRequestWorkspace({ eventId, majorTasks = [], onDashboardRefresh,
     onSuccess(message)
   }
 
+  const visibleRequests = useMemo(() => {
+    if (!activeViewDef.predicate) return requests
+    return requests.filter(activeViewDef.predicate)
+  }, [activeViewDef, requests])
+
   const requestStats = useMemo(() => {
     const counts = Object.fromEntries(statusOptions.map((status) => [status, 0]))
-    requests.forEach((request) => {
+    visibleRequests.forEach((request) => {
       counts[request.status] = toNumber(counts[request.status]) + 1
     })
     return counts
-  }, [requests])
+  }, [visibleRequests])
 
   return (
     <section className="space-y-4">
@@ -460,11 +531,36 @@ function ExpenseRequestWorkspace({ eventId, majorTasks = [], onDashboardRefresh,
           onSubmit={handleCreateSubmit}
         />
 
-        <Card title="Danh sách yêu cầu chi phí">
+        <Card
+          title={activeViewDef.title}
+          headerRight={<Badge variant="default">{activeViewDef.eyebrow}</Badge>}
+        >
+          <div className="mb-4 grid grid-cols-1 gap-2 lg:grid-cols-3">
+            {financeViews.map((view) => (
+              <button
+                key={view.key}
+                type="button"
+                className={`rounded-lg border px-3 py-2 text-left transition ${
+                  activeView === view.key
+                    ? 'border-primary bg-primary-bg text-primary'
+                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-primary/40'
+                }`}
+                onClick={() => handleViewChange(view.key)}
+              >
+                <span className="block text-sm font-semibold">{view.title}</span>
+                <span className="mt-1 block text-xs">{view.eyebrow}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-4 rounded-lg border border-info/20 bg-info-bg p-3 text-sm leading-6 text-info">
+            {activeViewDef.description} Chỉ các thao tác hợp lệ cho tài khoản hiện tại được hiển thị.
+          </div>
+
           <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
             <FormField label="Trạng thái">
               <Select name="status" value={filters.status} onChange={handleFilterChange}>
-                <option value="">Tất cả trạng thái</option>
+                <option value="">{activeViewDef.status ? `Mặc định: ${activeViewDef.status}` : 'Tất cả trạng thái'}</option>
                 {statusOptions.map((status) => (
                   <option key={status} value={status}>
                     {statusLabels[status]} ({status})
@@ -493,15 +589,15 @@ function ExpenseRequestWorkspace({ eventId, majorTasks = [], onDashboardRefresh,
             <div className="flex min-h-[260px] items-center justify-center">
               <Spinner size="lg" />
             </div>
-          ) : requests.length === 0 ? (
+          ) : visibleRequests.length === 0 ? (
             <EmptyState
               icon={<FileText size={24} />}
-              title="Chưa có yêu cầu chi phí"
-              description="Tạo yêu cầu chi phí từ task con để bắt đầu quy trình duyệt và thanh toán."
+              title={activeViewDef.emptyTitle}
+              description={activeViewDef.emptyDescription}
             />
           ) : (
             <div className="space-y-3">
-              {requests.map((request) => (
+              {visibleRequests.map((request) => (
                 <ExpenseRequestRow key={request.id} request={request} onOpen={handleOpenDetail} />
               ))}
             </div>
@@ -514,7 +610,9 @@ function ExpenseRequestWorkspace({ eventId, majorTasks = [], onDashboardRefresh,
             onPageChange={setCurrentPage}
             onPageSizeChange={handlePageSizeChange}
           />
-          <p className="mt-3 text-xs text-neutral-500">Tổng cộng {totalElements} yêu cầu theo bộ lọc hiện tại.</p>
+          <p className="mt-3 text-xs text-neutral-500">
+            Tổng cộng {visibleRequests.length}/{totalElements} yêu cầu theo view và bộ lọc hiện tại.
+          </p>
         </Card>
       </div>
 
@@ -628,6 +726,9 @@ function CreateExpenseRequestForm({ form, errors, majorTasks, subtasks, isSubtas
 }
 
 function ExpenseRequestRow({ request, onOpen }) {
+  const budgetTask = request.budgetSnapshot?.subtask || request.budgetSnapshot?.majorTask || request.budgetSnapshot?.sourceTask
+  const availableActions = getActionableButtons(request)
+
   return (
     <article className="rounded-lg border border-neutral-200 bg-white p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -638,7 +739,22 @@ function ExpenseRequestRow({ request, onOpen }) {
             <Badge variant="default">{requestTypeLabels[request.requestType] || request.requestType}</Badge>
           </div>
           <p className="mt-2 line-clamp-2 text-sm leading-6 text-neutral-500">{request.description || 'Chưa có mô tả'}</p>
-          <p className="mt-2 text-xs text-neutral-500">Tạo lúc {formatDateTime(request.createdAt)} · Version {request.currentVersion || 1}</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-neutral-500">
+            <span>Task: {getTaskContext(request)}</span>
+            <span>Lane: {request.reviewLane || 'N/A'}</span>
+            <span>Tạo lúc {formatDateTime(request.createdAt)}</span>
+            <span>Version {request.currentVersion || 1}</span>
+          </div>
+          {request.deniedReason ? (
+            <p className="mt-3 rounded-lg border border-danger/20 bg-danger-bg p-2 text-sm text-danger">
+              Lý do từ chối/hủy: {request.deniedReason}
+            </p>
+          ) : null}
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <QueueMetric label="Budget khả dụng" value={formatCurrency(budgetTask?.availableBudget)} />
+            <QueueMetric label="Sau yêu cầu" value={formatCurrency(Number(budgetTask?.availableBudget || 0) - Number(request.amountRequested || 0))} />
+            <QueueMetric label="Actions" value={getActionSummary(request)} tone={availableActions.length === 0 ? 'muted' : 'default'} />
+          </div>
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
           <div className="rounded-lg bg-neutral-50 px-3 py-2 text-right">
@@ -651,6 +767,15 @@ function ExpenseRequestRow({ request, onOpen }) {
         </div>
       </div>
     </article>
+  )
+}
+
+function QueueMetric({ label, value, tone = 'default' }) {
+  return (
+    <div className="rounded-lg bg-neutral-50 px-3 py-2">
+      <p className="text-xs text-neutral-500">{label}</p>
+      <p className={`mt-1 text-sm font-semibold ${tone === 'muted' ? 'text-neutral-500' : 'text-neutral-900'}`}>{value}</p>
+    </div>
   )
 }
 
@@ -677,7 +802,7 @@ function ExpenseRequestDetailPanel({ request, isLoading, onClose, onAfterMutatio
 
   if (!request && !isLoading) return null
 
-  const availableActions = request?.allowedActions || getAvailableActions(request?.status)
+  const availableActions = getActionableButtons(request)
 
   function startAction(action) {
     if (action === 'submit' || action === 'commit') {
@@ -786,9 +911,16 @@ function ExpenseRequestDetailPanel({ request, isLoading, onClose, onAfterMutatio
                 {request.nextReviewerLabel ? (
                   <p className="mt-3 rounded-lg bg-info-bg p-3 text-sm text-info">Bước tiếp theo: {request.nextReviewerLabel} review yêu cầu này.</p>
                 ) : null}
+                {request.deniedReason ? (
+                  <p className="mt-3 rounded-lg border border-danger/20 bg-danger-bg p-3 text-sm text-danger">
+                    Lý do từ chối/hủy: {request.deniedReason}
+                  </p>
+                ) : null}
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <DetailMetric label="Số tiền yêu cầu" value={formatCurrency(request.amountRequested)} />
                   <DetailMetric label="Số tiền duyệt" value={formatCurrency(request.amountApproved)} />
+                  <DetailMetric label="Task context" value={getTaskContext(request)} />
+                  <DetailMetric label="Review lane" value={request.reviewLane || 'N/A'} />
                   <DetailMetric label="Ngày tạo" value={formatDateTime(request.createdAt)} />
                   <DetailMetric label="Cập nhật" value={formatDateTime(request.updatedAt)} />
                   {request.paymentId ? <DetailMetric label="Mã thanh toán liên quan" value={request.paymentId} /> : null}
@@ -811,15 +943,27 @@ function ExpenseRequestDetailPanel({ request, isLoading, onClose, onAfterMutatio
                     <p className="mt-1 text-sm text-neutral-700">{request.reviewNote}</p>
                   </div>
                 ) : null}
+                {request.reviewerIdentity ? (
+                  <div className="mt-3 rounded-lg border border-neutral-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase text-neutral-500">Reviewer identity</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-900">
+                      {request.reviewerIdentity.displayName || request.reviewerIdentity.email || request.reviewedBy}
+                    </p>
+                    {request.reviewerIdentity.email ? <p className="mt-1 text-xs text-neutral-500">{request.reviewerIdentity.email}</p> : null}
+                  </div>
+                ) : null}
               </div>
+
+              <BudgetSnapshotPanel request={request} />
 
               <div className="rounded-lg border border-neutral-200 p-4">
                 <div className="flex flex-wrap gap-2">
                   {availableActions.length === 0 ? (
                     <p className="text-sm text-neutral-500">
-                      {request.status === 'ESCALATED'
-                        ? 'Yêu cầu đang chờ Chủ/Trưởng sự kiện khác người gửi duyệt hoặc từ chối. Tài khoản hiện tại không có quyền review yêu cầu chuyển cấp này.'
-                        : 'Tài khoản hiện tại không có thao tác phù hợp với trạng thái yêu cầu.'}
+                      {request.deniedReason
+                        || (request.status === 'ESCALATED'
+                          ? 'Yêu cầu đang chờ Event Lead khác requester duyệt hoặc từ chối. Tài khoản hiện tại không có quyền review yêu cầu chuyển cấp này.'
+                          : 'Tài khoản hiện tại không có thao tác phù hợp với trạng thái yêu cầu.')}
                     </p>
                   ) : (
                     availableActions.map((action) => {
@@ -890,6 +1034,72 @@ function DetailMetric({ label, value }) {
   )
 }
 
+function BudgetSnapshotPanel({ request }) {
+  const snapshot = request?.budgetSnapshot
+  if (!snapshot) {
+    return (
+      <div className="rounded-lg border border-neutral-200 p-4">
+        <EmptyState icon={<FileText size={24} />} title="Chưa có budget snapshot" description="Backend chưa trả snapshot ngân sách cho request này." />
+      </div>
+    )
+  }
+
+  const amount = Number(request.amountApproved || request.amountRequested || 0)
+  const items = [
+    ['Subtask', snapshot.subtask, -amount],
+    ['Major task', snapshot.majorTask, -amount],
+    ['Source task', snapshot.sourceTask, request.requestType === 'REALLOCATION_ESCALATE' ? -amount : null],
+    ['Target task', snapshot.targetTask, request.requestType === 'REALLOCATION_ESCALATE' ? amount : null],
+  ].filter(([, task]) => task)
+
+  return (
+    <div className="rounded-lg border border-neutral-200 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="font-semibold text-neutral-900">Budget snapshot</h3>
+          <p className="mt-1 text-xs text-neutral-500">Before/after dựa trên amount hiện tại của request.</p>
+        </div>
+        <Badge variant="default">{items.length} context</Badge>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {items.map(([label, task, delta]) => (
+          <BudgetTaskSnapshot key={`${label}-${task.taskId || task.taskName}`} label={label} task={task} delta={delta} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function BudgetTaskSnapshot({ label, task, delta }) {
+  const before = Number(task.availableBudget || 0)
+  const after = delta === null || delta === undefined ? null : before + delta
+
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase text-neutral-500">{label}</p>
+          <p className="mt-1 font-semibold text-neutral-900">{task.taskName || task.taskId || 'Task'}</p>
+        </div>
+        <Badge variant="default">{getLongIdFromUuid(task.taskId) || 'N/A'}</Badge>
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <DetailMetric label="Allocated" value={formatCurrency(task.allocatedBudget)} />
+        <DetailMetric label="Committed" value={formatCurrency(task.committedAmount)} />
+        <DetailMetric label="Available" value={formatCurrency(task.availableBudget)} />
+      </div>
+      {after !== null ? (
+        <div className="mt-3 rounded-lg bg-white p-3">
+          <p className="text-xs font-medium text-neutral-500">Before / after</p>
+          <p className="mt-1 font-semibold text-neutral-900">
+            {formatCurrency(before)} {'>'} {formatCurrency(after)}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function ExpenseActionForm({ action, form, errors, isSubmitting, onChange, onCancel, onSubmit }) {
   return (
     <form className="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4" onSubmit={onSubmit} noValidate>
@@ -943,6 +1153,8 @@ function ExpenseActionForm({ action, form, errors, isSubmitting, onChange, onCan
 }
 
 function AttachmentSection({ request, file, label, error, isUploading, onFileChange, onLabelChange, onSubmit }) {
+  const canUpload = request.editableAttachment === true && request.allowedActions.includes('uploadAttachment')
+
   return (
     <div className="rounded-lg border border-neutral-200 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -953,19 +1165,25 @@ function AttachmentSection({ request, file, label, error, isUploading, onFileCha
         <Badge variant="default">{request.attachments.length}</Badge>
       </div>
 
-      <form className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]" onSubmit={onSubmit} noValidate>
-        <FormField label="File" error={error}>
-          <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx" onChange={onFileChange} error={error} />
-        </FormField>
-        <FormField label="Label">
-          <Input value={label} onChange={onLabelChange} placeholder="Hóa đơn, báo giá..." />
-        </FormField>
-        <div className="flex items-end">
-          <Button type="submit" loading={isUploading} leftIcon={<Upload size={16} />} disabled={!file}>
-            Upload
-          </Button>
-        </div>
-      </form>
+      {canUpload ? (
+        <form className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]" onSubmit={onSubmit} noValidate>
+          <FormField label="File" error={error}>
+            <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx" onChange={onFileChange} error={error} />
+          </FormField>
+          <FormField label="Label">
+            <Input value={label} onChange={onLabelChange} placeholder="Hóa đơn, báo giá..." />
+          </FormField>
+          <div className="flex items-end">
+            <Button type="submit" loading={isUploading} leftIcon={<Upload size={16} />} disabled={!file}>
+              Upload
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-500">
+          Attachment đang ở chế độ chỉ đọc cho tài khoản hoặc trạng thái hiện tại.
+        </p>
+      )}
 
       {request.attachments.length === 0 ? (
         <EmptyState icon={<Paperclip size={24} />} title="Chưa có attachment" description="Attachment sẽ hiển thị tại đây sau khi upload." />

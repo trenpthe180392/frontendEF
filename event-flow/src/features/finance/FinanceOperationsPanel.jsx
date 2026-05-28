@@ -39,6 +39,14 @@ const paymentActionLabels = {
   reverse: 'Hoàn tác thanh toán',
 }
 
+const requestTypeLabels = {
+  ACTUAL_COST: 'Chi phí thực tế',
+  ADVANCE_REQUEST: 'Tạm ứng',
+  REIMBURSEMENT: 'Hoàn ứng',
+  ADDITIONAL_BUDGET: 'Bổ sung ngân sách',
+  REALLOCATION_ESCALATE: 'Điều chuyển nâng cấp',
+}
+
 const escalateDefaults = {
   sourceMajorTaskId: '',
   targetMajorTaskId: '',
@@ -95,6 +103,34 @@ function normalizePayment(payment) {
   }
 }
 
+function normalizePaymentExpense(expense) {
+  if (!expense) return null
+
+  return {
+    id: expense.id,
+    endpointId: getLongIdFromUuid(expense.id),
+    title: expense.title || 'Yêu cầu chi phí',
+    status: expense.status,
+    requestType: expense.requestType,
+    amountRequested: expense.amountRequested,
+    amountApproved: expense.amountApproved,
+    reviewLane: expense.reviewLane,
+    reviewerIdentity: expense.reviewerIdentity || null,
+    reviewedBy: expense.reviewedBy,
+    deniedReason: expense.deniedReason,
+    budgetSnapshot: expense.budgetSnapshot || null,
+    attachments: Array.isArray(expense.attachments) ? expense.attachments : [],
+  }
+}
+
+function getPaymentExpenseTask(expense) {
+  const snapshot = expense?.budgetSnapshot
+  return snapshot?.subtask?.taskName
+    || snapshot?.majorTask?.taskName
+    || snapshot?.sourceTask?.taskName
+    || 'Chưa có task context'
+}
+
 function normalizeSubtask(task) {
   return {
     id: task?.subtaskId || task?.id || task?.taskId,
@@ -114,8 +150,10 @@ function validatePositiveAmount(value, message) {
 function FinanceOperationsPanel({ eventId, majorTasks = [], onDashboardRefresh, onError, onSuccess }) {
   const [paymentId, setPaymentId] = useState('')
   const [payment, setPayment] = useState(null)
+  const [paymentExpense, setPaymentExpense] = useState(null)
   const [payments, setPayments] = useState([])
   const [isPaymentLoading, setIsPaymentLoading] = useState(false)
+  const [isPaymentExpenseLoading, setIsPaymentExpenseLoading] = useState(false)
   const [isPaymentsLoading, setIsPaymentsLoading] = useState(false)
   const [payForm, setPayForm] = useState(payDefaults)
   const [reverseForm, setReverseForm] = useState(reverseDefaults)
@@ -176,12 +214,33 @@ function FinanceOperationsPanel({ eventId, majorTasks = [], onDashboardRefresh, 
     loadInternalSubtasks()
   }, [internalForm.majorTaskId, onError])
 
+  async function loadPaymentExpense(nextPayment) {
+    if (!nextPayment?.expenseRequestId) {
+      setPaymentExpense(null)
+      return
+    }
+
+    setIsPaymentExpenseLoading(true)
+    try {
+      const response = await financeApi.expenseRequests.get(nextPayment.expenseRequestId)
+      setPaymentExpense(normalizePaymentExpense(response))
+    } catch (err) {
+      setPaymentExpense(null)
+      onError(getErrorMessage(err))
+    } finally {
+      setIsPaymentExpenseLoading(false)
+    }
+  }
+
   async function selectPayment(selectedPayment) {
-    setPaymentId(selectedPayment.endpointId || selectedPayment.id || '')
+    const nextPaymentId = selectedPayment.endpointId || selectedPayment.id || ''
+    setPaymentId(nextPaymentId)
     setPayment(selectedPayment)
+    setPaymentExpense(null)
     setPayForm(payDefaults)
     setReverseForm(reverseDefaults)
     setPaymentErrors({})
+    await loadPaymentExpense(selectedPayment)
   }
 
   async function handleLoadPayment(event) {
@@ -197,11 +256,14 @@ function FinanceOperationsPanel({ eventId, majorTasks = [], onDashboardRefresh, 
 
     try {
       const response = await financeApi.payments.get(paymentId.trim())
-      setPayment(normalizePayment(response))
+      const nextPayment = normalizePayment(response)
+      setPayment(nextPayment)
+      await loadPaymentExpense(nextPayment)
       setPayForm(payDefaults)
       setReverseForm(reverseDefaults)
     } catch (err) {
       setPayment(null)
+      setPaymentExpense(null)
       onError(getErrorMessage(err))
     } finally {
       setIsPaymentLoading(false)
@@ -272,6 +334,7 @@ function FinanceOperationsPanel({ eventId, majorTasks = [], onDashboardRefresh, 
       const nextPayment = normalizePayment(response)
       setPayment(nextPayment)
       setPaymentId(nextPayment?.endpointId || nextPayment?.id || paymentId)
+      await loadPaymentExpense(nextPayment)
       setPayForm(payDefaults)
       setReverseForm(reverseDefaults)
       await onDashboardRefresh?.()
@@ -503,7 +566,9 @@ function FinanceOperationsPanel({ eventId, majorTasks = [], onDashboardRefresh, 
           payments={payments}
           paymentId={paymentId}
           payment={payment}
+          paymentExpense={paymentExpense}
           isLoading={isPaymentLoading}
+          isExpenseLoading={isPaymentExpenseLoading}
           isPaymentsLoading={isPaymentsLoading}
           isMutating={isPaymentMutating}
           payForm={payForm}
@@ -574,7 +639,9 @@ function PaymentActionsCard({
   payments,
   paymentId,
   payment,
+  paymentExpense,
   isLoading,
+  isExpenseLoading,
   isPaymentsLoading,
   isMutating,
   payForm,
@@ -589,8 +656,13 @@ function PaymentActionsCard({
   onReverseChange,
   onReverseSubmit,
 }) {
+  const hasPaymentAction = payment?.allowedActions?.length > 0
+
   return (
-    <Card title="Chi tiết thanh toán và thao tác">
+    <Card title="Payment Queue" headerRight={<Badge variant="default">FM/FE scoped</Badge>}>
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg p-3 text-sm leading-6 text-info">
+        Phạm vi FM/FE: chỉ các thao tác hợp lệ theo vai trò, SOD và trạng thái payment được hiển thị.
+      </div>
       <div className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-neutral-900">Thanh toán của sự kiện</p>
@@ -642,6 +714,9 @@ function PaymentActionsCard({
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={paymentStatusVariants[payment.status] || 'default'}>{paymentStatusLabels[payment.status] || payment.status}</Badge>
               <Badge variant="default">ID {payment.endpointId || payment.id}</Badge>
+              {payment.allowedActions.map((action) => (
+                <Badge key={action} variant="default">{paymentActionLabels[action] || action}</Badge>
+              ))}
             </div>
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <PaymentMetric label="Số tiền" value={formatCurrency(payment.amount)} />
@@ -650,6 +725,14 @@ function PaymentActionsCard({
               <PaymentMetric label="Trạng thái" value={payment.status} />
             </div>
           </div>
+
+          <PaymentExpenseContext expense={paymentExpense} isLoading={isExpenseLoading} />
+
+          {!hasPaymentAction ? (
+            <p className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-500">
+              Không có thao tác thanh toán cho tài khoản hiện tại. Có thể do SOD, thiếu proof, sai vai trò FM/FE hoặc payment đã ở trạng thái terminal.
+            </p>
+          ) : null}
 
           {payment.status === 'PENDING' && payment.allowedActions.includes('approve') ? (
             <Button type="button" variant="secondary" loading={isMutating} leftIcon={<CheckCircle2 size={16} />} onClick={onApprove}>
@@ -708,6 +791,54 @@ function PaymentMetric({ label, value }) {
     <div className="rounded-lg bg-white p-3">
       <p className="text-xs font-medium text-neutral-500">{label}</p>
       <p className="mt-1 break-words font-semibold text-neutral-900">{value}</p>
+    </div>
+  )
+}
+
+function PaymentExpenseContext({ expense, isLoading }) {
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[120px] items-center justify-center rounded-lg border border-neutral-200">
+        <Spinner size="sm" />
+      </div>
+    )
+  }
+
+  if (!expense) {
+    return (
+      <div className="rounded-lg border border-neutral-200 p-4">
+        <EmptyState icon={<Banknote size={24} />} title="Chưa có expense context" description="Payment này chưa có hoặc chưa tải được request liên quan." />
+      </div>
+    )
+  }
+
+  const reviewer = expense.reviewerIdentity?.displayName || expense.reviewerIdentity?.email || getLongIdFromUuid(expense.reviewedBy) || 'Chưa có reviewer'
+  const proofCount = expense.attachments.length
+
+  return (
+    <div className="rounded-lg border border-neutral-200 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="font-semibold text-neutral-900">Request, task và review chain</h3>
+          <p className="mt-1 text-sm text-neutral-500">{expense.title}</p>
+        </div>
+        <Badge variant="default">{requestTypeLabels[expense.requestType] || expense.requestType || 'Expense'}</Badge>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <PaymentMetric label="Request ID" value={expense.endpointId || expense.id} />
+        <PaymentMetric label="Task" value={getPaymentExpenseTask(expense)} />
+        <PaymentMetric label="Review lane" value={expense.reviewLane || 'N/A'} />
+        <PaymentMetric label="Reviewer" value={reviewer} />
+        <PaymentMetric label="Requested" value={formatCurrency(expense.amountRequested)} />
+        <PaymentMetric label="Approved" value={formatCurrency(expense.amountApproved)} />
+        <PaymentMetric label="Proof/attachments" value={`${proofCount} file`} />
+        <PaymentMetric label="Expense status" value={expense.status || 'N/A'} />
+      </div>
+      {expense.deniedReason ? (
+        <p className="mt-3 rounded-lg border border-danger/20 bg-danger-bg p-3 text-sm text-danger">
+          Lý do từ chối/hủy expense: {expense.deniedReason}
+        </p>
+      ) : null}
     </div>
   )
 }
